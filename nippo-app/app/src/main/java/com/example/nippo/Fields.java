@@ -11,6 +11,8 @@ public class Fields {
         }
     }
 
+    public static final String OCR = "_ocr";   // 読み取った全文(全データ)
+
     public static final String MINUTES = "拘束時間", INCOME = "営業収入";
 
     public static final F[] ALL = {

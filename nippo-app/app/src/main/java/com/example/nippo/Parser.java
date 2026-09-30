@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 /** OCR結果から日付と各項目を取り出す。読めなかった項目は含まれない。 */
 public class Parser {
     public Integer year, month, day;
+    public String raw = "";
     public final Map<String, String> fields = new LinkedHashMap<>();
 
     private static final Pattern DATE = Pattern.compile("(\\d{4})\\s*年\\s*(\\d{1,2})\\s*月\\s*(\\d{1,2})\\s*日");
@@ -20,6 +21,7 @@ public class Parser {
 
     public static Parser parse(Text t) {
         Parser p = new Parser();
+        p.raw = t.getText();
         Matcher m = DATE.matcher(t.getText());
         if (m.find()) {
             p.year = Integer.parseInt(m.group(1));

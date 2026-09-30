@@ -46,6 +46,7 @@ public class Store {
             if (v.startsWith("{")) {
                 JSONObject o = new JSONObject(v);
                 for (Fields.F f : Fields.ALL) if (o.has(f.label)) m.put(f.label, o.getString(f.label));
+                if (o.has(Fields.OCR)) m.put(Fields.OCR, o.getString(Fields.OCR));
             } else {                                   // 旧形式 "分|円"
                 String[] p = v.split("\\|");
                 m.put(Fields.MINUTES, Integer.parseInt(p[0]) / 60 + ":" + String.format("%02d", Integer.parseInt(p[0]) % 60));

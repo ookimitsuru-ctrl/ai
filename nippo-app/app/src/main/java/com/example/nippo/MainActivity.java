@@ -215,10 +215,42 @@ public class MainActivity extends Activity {
     }
 
     // ---- 確認・編集 ----
+    /** 取り込み確認。全データを保存し、ここでは日付・拘束時間・営業収入だけを表示する。 */
     private void confirm(Parser p) {
         LocalDate d = null;
         try { if (p.year != null) d = LocalDate.of(p.year, p.month, p.day); } catch (Exception ignored) {}
-        editDialog(d != null ? d : LocalDate.now(), new Store.Entry(p.fields));
+        final LocalDate date0 = d != null ? d : LocalDate.now();
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
+        l.setPadding(dp(20), dp(8), dp(20), 0);
+        EditText date = field("日付 (yyyy-MM-dd)", date0.toString(), InputType.TYPE_CLASS_DATETIME);
+        EditText time = field("拘束時間 (例 18:11)", p.fields.getOrDefault(Fields.MINUTES, ""), InputType.TYPE_CLASS_DATETIME);
+        EditText yen = field("営業収入 (円)", p.fields.getOrDefault(Fields.INCOME, ""), InputType.TYPE_CLASS_NUMBER);
+        l.addView(date); l.addView(time); l.addView(yen);
+        new AlertDialog.Builder(this)
+                .setTitle("取り込み内容の確認")
+                .setView(l)
+                .setPositiveButton("保存", (dlg, w) -> {
+                    try {
+                        LocalDate nd = LocalDate.parse(date.getText().toString().trim());
+                        String tv = time.getText().toString().trim().replace("：", ":");
+                        String[] tp = tv.split(":");
+                        Integer.parseInt(tp[0]); Integer.parseInt(tp[1]);
+                        String yv = yen.getText().toString().trim().replace(",", "");
+                        Long.parseLong(yv);
+                        Map<String, String> m = new LinkedHashMap<>(p.fields);   // 読み取れた全項目
+                        m.put(Fields.MINUTES, tv);
+                        m.put(Fields.INCOME, yv);
+                        m.put(Fields.OCR, p.raw);
+                        store.put(nd, new Store.Entry(m));
+                        periodStart = nd.getDayOfMonth() >= 16 ? nd.withDayOfMonth(16) : nd.minusMonths(1).withDayOfMonth(16);
+                        render();
+                    } catch (Exception ex) {
+                        Toast.makeText(this, "入力形式が正しくありません", Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNegativeButton("キャンセル", null)
+                .show();
     }
 
     /** 日付をタップしたとき、保存した日報の全項目を表示する。 */
@@ -226,6 +258,8 @@ public class MainActivity extends Activity {
         StringBuilder sb = new StringBuilder();
         for (Fields.F f : Fields.ALL)
             sb.append(f.label).append(":  ").append(Fields.display(f, e.f.get(f.label))).append("\n");
+        String ocr = e.f.get(Fields.OCR);
+        if (ocr != null && !ocr.isEmpty()) sb.append("\n--- 読み取った全文 ---\n").append(ocr).append("\n");
         TextView t = tv(sb.toString(), 16, Color.BLACK, Gravity.START);
         t.setPadding(dp(20), dp(12), dp(20), dp(12));
         t.setLineSpacing(dp(4), 1f);
@@ -274,6 +308,7 @@ public class MainActivity extends Activity {
                             }
                             m.put(f.label, v);
                         }
+                        if (e.f.get(Fields.OCR) != null) m.put(Fields.OCR, e.f.get(Fields.OCR));
                         store.put(nd, new Store.Entry(m));
                         periodStart = nd.getDayOfMonth() >= 16 ? nd.withDayOfMonth(16) : nd.minusMonths(1).withDayOfMonth(16);
                         render();
