@@ -28,7 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class MainActivity extends Activity {
-    private static final int REQ_CAMERA = 1;
+    private static final int REQ_CAMERA = 1, REQ_PICK = 2;
     private static final String[] WEEK = {"日", "月", "火", "水", "木", "金", "土"};
 
     private Store store;
@@ -69,9 +69,13 @@ public class MainActivity extends Activity {
         LocalDate end = periodStart.plusMonths(1).withDayOfMonth(15);
 
         Button shoot = new Button(this);
-        shoot.setText("📷 日報を撮影して保存");
+        shoot.setText("📷 日報を撮影して取り込み");
         shoot.setOnClickListener(v -> startCamera());
         root.addView(shoot);
+        Button pick = new Button(this);
+        pick.setText("🖼 写真から取り込み");
+        pick.setOnClickListener(v -> startPick());
+        root.addView(pick);
 
         LinearLayout nav = new LinearLayout(this);
         nav.setGravity(Gravity.CENTER_VERTICAL);
@@ -162,23 +166,45 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ---- 保存済みの写真から取り込み(写真は削除しない) ----
+    private void startPick() {
+        try {
+            Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+            i.setType("image/*");
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            startActivityForResult(Intent.createChooser(i, "日報の写真を選択"), REQ_PICK);
+        } catch (Exception e) {
+            Toast.makeText(this, "写真を選べません: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == REQ_PICK) {
+            if (res != RESULT_OK || data == null || data.getData() == null) return;
+            recognize(data.getData(), false);
+            return;
+        }
         if (req != REQ_CAMERA) return;
         if (res != RESULT_OK || photoFile == null || !photoFile.exists()) { deletePhoto(); return; }
+        recognize(Uri.fromFile(photoFile), true);
+    }
+
+    /** 画像を読み取る。撮影した写真(deleteAfter=true)は処理後に削除、選んだ写真は残す。 */
+    private void recognize(Uri uri, boolean deleteAfter) {
         Toast.makeText(this, "読み取り中…", Toast.LENGTH_SHORT).show();
         try {
-            InputImage img = InputImage.fromFilePath(this, Uri.fromFile(photoFile));
+            InputImage img = InputImage.fromFilePath(this, uri);
             recognizer.process(img)
-                .addOnSuccessListener(t -> { Parser p = Parser.parse(t); deletePhoto(); confirm(p); })
+                .addOnSuccessListener(t -> { Parser p = Parser.parse(t); if (deleteAfter) deletePhoto(); confirm(p); })
                 .addOnFailureListener(e -> {
-                    deletePhoto();
+                    if (deleteAfter) deletePhoto();
                     Toast.makeText(this, "読み取り失敗: " + e.getMessage(), Toast.LENGTH_LONG).show();
                     confirm(new Parser());
                 });
         } catch (Exception e) {
-            deletePhoto();
+            if (deleteAfter) deletePhoto();
             Toast.makeText(this, "画像を開けません", Toast.LENGTH_LONG).show();
         }
     }
