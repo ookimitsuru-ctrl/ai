@@ -16,6 +16,14 @@ android {
     }
 }
 
+configurations.all {
+    resolutionStrategy.eachDependency { d ->
+        if (d.requested.group == 'org.jetbrains.kotlin' && d.requested.name.startsWith('kotlin-stdlib')) {
+            d.useVersion '1.8.22'
+        }
+    }
+}
+
 dependencies {
     implementation 'androidx.core:core:1.13.1'
     implementation 'com.google.mlkit:text-recognition-japanese:16.0.1'
