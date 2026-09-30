@@ -3,7 +3,6 @@ package com.example.nippo;
 import android.content.Context;
 import android.content.SharedPreferences;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.json.JSONObject;
@@ -68,11 +67,14 @@ public class Store {
         return first;
     }
 
-    /** 最初の記入日を 1 とした連番。それより前は 0。 */
+    /** データのある日だけ、日付順に 1,2,3… の連番。データのない日は 0。 */
     public int serial(LocalDate d) {
-        LocalDate first = firstDate();
-        if (first == null || d.isBefore(first)) return 0;
-        return (int) ChronoUnit.DAYS.between(first, d) + 1;
+        if (!sp.contains(d.toString())) return 0;
+        int n = 0;
+        for (String k : sp.getAll().keySet()) {
+            try { if (!LocalDate.parse(k).isAfter(d)) n++; } catch (Exception ignored) {}
+        }
+        return n;
     }
 
     public static String fmtTime(int minutes) {
