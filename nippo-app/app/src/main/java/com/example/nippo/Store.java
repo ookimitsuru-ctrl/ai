@@ -67,12 +67,16 @@ public class Store {
         return first;
     }
 
-    /** データのある日だけ、日付順に 1,2,3… の連番。データのない日は 0。 */
+    /** データのある日だけ、カレンダー1ページ(16日〜翌15日)ごとに 1 から日付順の連番。データのない日は 0。 */
     public int serial(LocalDate d) {
         if (!sp.contains(d.toString())) return 0;
+        LocalDate start = d.getDayOfMonth() >= 16 ? d.withDayOfMonth(16) : d.minusMonths(1).withDayOfMonth(16);
         int n = 0;
         for (String k : sp.getAll().keySet()) {
-            try { if (!LocalDate.parse(k).isAfter(d)) n++; } catch (Exception ignored) {}
+            try {
+                LocalDate x = LocalDate.parse(k);
+                if (!x.isBefore(start) && !x.isAfter(d)) n++;
+            } catch (Exception ignored) {}
         }
         return n;
     }
