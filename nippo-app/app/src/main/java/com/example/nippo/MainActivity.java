@@ -11,6 +11,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -23,6 +24,8 @@ import com.google.mlkit.vision.text.TextRecognizer;
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions;
 import java.io.File;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class MainActivity extends Activity {
     private static final int REQ_CAMERA = 1;
@@ -100,18 +103,30 @@ public class MainActivity extends Activity {
             Store.Entry e = store.get(d);
             String txt = d.getDayOfMonth() + "";
             if (e != null) {
-                txt += "\n" + Store.fmtTime(e.minutes) + "\n" + Store.fmtYen(e.yen);
-                totalMin += e.minutes;
-                totalYen += e.yen;
+                txt += "\n" + Store.fmtTime(e.minutes()) + "\n" + Store.fmtYen(e.yen());
+                totalMin += e.minutes();
+                totalYen += e.yen();
             }
-            TextView c = tv(txt, 10, Color.BLACK, Gravity.CENTER);
+            FrameLayout c = new FrameLayout(this);
             c.setBackgroundColor(e != null ? 0xFFE3F2FD : 0xFFF5F5F5);
-            c.setMinHeight(dp(64));
-            c.setPadding(0, dp(2), 0, dp(2));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
+            c.setMinimumHeight(dp(64));
+            int serial = store.serial(d);
+            if (serial > 0) {                       // 最初の記入日からの連番を枠いっぱいに透かし表示
+                TextView wm = tv(String.valueOf(serial), 30, 0x33000000, Gravity.CENTER);
+                wm.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                wm.setIncludeFontPadding(false);
+                c.addView(wm, new FrameLayout.LayoutParams(-1, -1));
+            }
+            TextView label = tv(txt, 10, Color.BLACK, Gravity.CENTER);
+            label.setPadding(0, dp(2), 0, dp(2));
+            c.addView(label, new FrameLayout.LayoutParams(-1, -1));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(64), 1);
             lp.setMargins(1, 1, 1, 1);
             final LocalDate dd = d;
-            c.setOnClickListener(v -> editDialog(dd, store.get(dd)));
+            c.setOnClickListener(v -> {
+                Store.Entry cur = store.get(dd);
+                if (cur != null) detailDialog(dd, cur); else editDialog(dd, new Store.Entry(new LinkedHashMap<>()));
+            });
             row.addView(c, lp);
         }
         if (row != null) {
@@ -177,9 +192,26 @@ public class MainActivity extends Activity {
     private void confirm(Parser p) {
         LocalDate d = null;
         try { if (p.year != null) d = LocalDate.of(p.year, p.month, p.day); } catch (Exception ignored) {}
-        Store.Entry e = (p.minutes != null && p.yen != null) ? new Store.Entry(p.minutes, p.yen)
-                : new Store.Entry(p.minutes != null ? p.minutes : 0, p.yen != null ? p.yen : 0);
-        editDialog(d != null ? d : LocalDate.now(), e);
+        editDialog(d != null ? d : LocalDate.now(), new Store.Entry(p.fields));
+    }
+
+    /** 日付をタップしたとき、保存した日報の全項目を表示する。 */
+    private void detailDialog(LocalDate d, Store.Entry e) {
+        StringBuilder sb = new StringBuilder();
+        for (Fields.F f : Fields.ALL)
+            sb.append(f.label).append(":  ").append(Fields.display(f, e.f.get(f.label))).append("\n");
+        TextView t = tv(sb.toString(), 16, Color.BLACK, Gravity.START);
+        t.setPadding(dp(20), dp(12), dp(20), dp(12));
+        t.setLineSpacing(dp(4), 1f);
+        ScrollView sv = new ScrollView(this);
+        sv.addView(t);
+        new AlertDialog.Builder(this)
+                .setTitle("運転者営業日報  " + d.getYear() + "年" + d.getMonthValue() + "月" + d.getDayOfMonth() + "日")
+                .setView(sv)
+                .setPositiveButton("閉じる", null)
+                .setNegativeButton("編集", (dlg, w) -> editDialog(d, e))
+                .setNeutralButton("削除", (dlg, w) -> { store.remove(d); render(); })
+                .show();
     }
 
     private void editDialog(LocalDate d, Store.Entry e) {
@@ -187,30 +219,44 @@ public class MainActivity extends Activity {
         l.setOrientation(LinearLayout.VERTICAL);
         l.setPadding(dp(20), dp(8), dp(20), 0);
         EditText date = field("日付 (yyyy-MM-dd)", d.toString(), InputType.TYPE_CLASS_DATETIME);
-        EditText time = field("拘束時間 (例 18:11)", e == null ? "" : Store.fmtTime(e.minutes), InputType.TYPE_CLASS_DATETIME);
-        EditText yen = field("営業収入 (円)", e == null ? "" : String.valueOf(e.yen), InputType.TYPE_CLASS_NUMBER);
-        l.addView(date); l.addView(time); l.addView(yen);
-        AlertDialog.Builder b = new AlertDialog.Builder(this)
+        l.addView(date);
+        Map<String, EditText> edits = new LinkedHashMap<>();
+        for (Fields.F f : Fields.ALL) {
+            String hint = f.label + (f.type == Fields.TIME ? " (例 18:11)" : f.unit.isEmpty() ? "" : " (" + f.unit + ")");
+            String v = e.f.get(f.label);
+            EditText et = field(hint, v == null ? "" : v, f.type == Fields.TIME ? InputType.TYPE_CLASS_DATETIME : InputType.TYPE_CLASS_NUMBER);
+            edits.put(f.label, et);
+            l.addView(et);
+        }
+        ScrollView sv = new ScrollView(this);
+        sv.addView(l);
+        new AlertDialog.Builder(this)
                 .setTitle("運転者営業日報")
-                .setView(l)
+                .setView(sv)
                 .setPositiveButton("保存", (dlg, w) -> {
                     try {
                         LocalDate nd = LocalDate.parse(date.getText().toString().trim());
-                        String[] tp = time.getText().toString().trim().split("[:：]");
-                        int min = Integer.parseInt(tp[0]) * 60 + Integer.parseInt(tp[1]);
-                        int y = Integer.parseInt(yen.getText().toString().trim().replace(",", ""));
-                        store.put(nd, new Store.Entry(min, y));
-                        LocalDate s = nd.getDayOfMonth() >= 16 ? nd.withDayOfMonth(16) : nd.minusMonths(1).withDayOfMonth(16);
-                        periodStart = s;
+                        Map<String, String> m = new LinkedHashMap<>();
+                        for (Fields.F f : Fields.ALL) {
+                            String v = edits.get(f.label).getText().toString().trim().replace(",", "").replace("：", ":");
+                            if (v.isEmpty()) continue;
+                            if (f.type == Fields.TIME) {
+                                String[] tp = v.split(":");
+                                Integer.parseInt(tp[0]); Integer.parseInt(tp[1]);
+                            } else {
+                                Long.parseLong(v);
+                            }
+                            m.put(f.label, v);
+                        }
+                        store.put(nd, new Store.Entry(m));
+                        periodStart = nd.getDayOfMonth() >= 16 ? nd.withDayOfMonth(16) : nd.minusMonths(1).withDayOfMonth(16);
                         render();
                     } catch (Exception ex) {
                         Toast.makeText(this, "入力形式が正しくありません", Toast.LENGTH_LONG).show();
                     }
                 })
-                .setNegativeButton("キャンセル", null);
-        if (store.get(d) != null)
-            b.setNeutralButton("削除", (dlg, w) -> { store.remove(d); render(); });
-        b.show();
+                .setNegativeButton("キャンセル", null)
+                .show();
     }
 
     private EditText field(String hint, String val, int type) {

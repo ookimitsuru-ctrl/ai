@@ -3,15 +3,16 @@ package com.example.nippo;
 import android.graphics.Rect;
 import com.google.mlkit.vision.text.Text;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** OCR結果から 日付・拘束時間・営業収入 を取り出す。読めなかった項目は null。 */
+/** OCR結果から日付と各項目を取り出す。読めなかった項目は含まれない。 */
 public class Parser {
     public Integer year, month, day;
-    public Integer minutes;
-    public Integer yen;
+    public final Map<String, String> fields = new LinkedHashMap<>();
 
     private static final Pattern DATE = Pattern.compile("(\\d{4})\\s*年\\s*(\\d{1,2})\\s*月\\s*(\\d{1,2})\\s*日");
     private static final Pattern TIME = Pattern.compile("(\\d{1,2})\\s*[:：;.]\\s*(\\d{2})");
@@ -32,25 +33,33 @@ public class Parser {
                 lines.add(l);
                 elems.addAll(l.getElements());
             }
-        String v = valueFor(lines, elems, "拘束時間", TIME);
-        if (v != null) {
-            Matcher tm = TIME.matcher(v);
-            if (tm.find()) p.minutes = Integer.parseInt(tm.group(1)) * 60 + Integer.parseInt(tm.group(2));
-        }
-        v = valueFor(lines, elems, "営業収入", NUM);
-        if (v != null) {
-            Matcher nm = NUM.matcher(v);
-            if (nm.find()) p.yen = Integer.parseInt(nm.group().replaceAll("[,.]", ""));
+        for (Fields.F f : Fields.ALL) {
+            String v = valueFor(lines, elems, f);
+            if (v == null) continue;
+            if (f.type == Fields.TIME) {
+                Matcher tm = TIME.matcher(v);
+                if (tm.find()) p.fields.put(f.label, Integer.parseInt(tm.group(1)) + ":" + tm.group(2));
+            } else {
+                Matcher nm = NUM.matcher(v);
+                if (nm.find()) p.fields.put(f.label, nm.group().replaceAll("[,.]", ""));
+            }
         }
         return p;
     }
 
-    /** ラベルを含む行を探し、同じ行(または同じ高さで右側)にある値を返す。 */
-    private static String valueFor(List<Text.Line> lines, List<Text.Element> elems, String label, Pattern pat) {
+    /** ラベルで始まる行を探し、同じ行(または同じ高さで右側)にある値を返す。 */
+    private static String valueFor(List<Text.Line> lines, List<Text.Element> elems, Fields.F f) {
+        Pattern pat = f.type == Fields.TIME ? TIME : NUM;
+        List<String> names = new ArrayList<>();
+        names.add(f.label);
+        for (String a : f.aliases) names.add(a);
         for (Text.Line l : lines) {
-            if (!l.getText().replace(" ", "").contains(label)) continue;
-            String s = l.getText().replace(" ", "");
-            String after = s.substring(s.indexOf(label) + label.length());
+            String s = l.getText().replace(" ", "").replace("　", "");
+            String name = null;
+            for (String n : names) if (s.startsWith(n)) { name = n; break; }
+            if (name == null) continue;
+            if (f.label.equals("合計") && s.startsWith("合計金額")) continue;
+            String after = s.substring(name.length());
             if (pat.matcher(after).find()) return after;
             Rect r = l.getBoundingBox();
             if (r == null) continue;
