@@ -43,7 +43,6 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         store = new Store(this);
-        recognizer = TextRecognition.getClient(new JapaneseTextRecognizerOptions.Builder().build());
         LocalDate t = LocalDate.now();
         periodStart = t.getDayOfMonth() >= 16 ? t.withDayOfMonth(16) : t.minusMonths(1).withDayOfMonth(16);
         ScrollView sv = new ScrollView(this);
@@ -282,6 +281,7 @@ public class MainActivity extends Activity {
     private void recognize(Uri uri, boolean deleteAfter) {
         Toast.makeText(this, "読み取り中…", Toast.LENGTH_SHORT).show();
         try {
+            if (recognizer == null) recognizer = TextRecognition.getClient(new JapaneseTextRecognizerOptions.Builder().build());
             InputImage img = InputImage.fromFilePath(this, uri);
             recognizer.process(img)
                 .addOnSuccessListener(t -> { Parser p = Parser.parse(t); if (deleteAfter) deletePhoto(); confirm(p); })
