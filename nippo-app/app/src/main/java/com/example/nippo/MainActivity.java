@@ -10,6 +10,7 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.PopupMenu;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -36,6 +37,7 @@ public class MainActivity extends Activity {
     private File photoFile;
     private LinearLayout root;
     private TextRecognizer recognizer;
+    private boolean inStats = false;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -64,9 +66,26 @@ public class MainActivity extends Activity {
         return t;
     }
 
+    @Override
+    public void onBackPressed() {
+        if (inStats) { render(); return; }
+        super.onBackPressed();
+    }
+
     private void render() {
+        inStats = false;
         root.removeAllViews();
         LocalDate end = periodStart.plusMonths(1).withDayOfMonth(15);
+
+        Button menu = new Button(this);
+        menu.setText("☰ メニュー");
+        menu.setOnClickListener(v -> {
+            PopupMenu pm = new PopupMenu(this, v);
+            pm.getMenu().add(0, 1, 0, "月別集計・グラフ");
+            pm.setOnMenuItemClickListener(it -> { if (it.getItemId() == 1) showStats(); return true; });
+            pm.show();
+        });
+        root.addView(menu);
 
         Button shoot = new Button(this);
         shoot.setText("📷 日報を撮影して取り込み");
@@ -148,6 +167,74 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, -2);
         sp.topMargin = dp(12);
         root.addView(sum, sp);
+    }
+
+    // ---- 月別集計 ----
+    private void showStats() {
+        inStats = true;
+        root.removeAllViews();
+        Button back = new Button(this);
+        back.setText("◀ カレンダーに戻る");
+        back.setOnClickListener(v -> render());
+        root.addView(back);
+        root.addView(tv("月別集計(16日〜翌15日)", 18, Color.BLACK, Gravity.START));
+
+        java.util.TreeMap<LocalDate, int[]> agg = new java.util.TreeMap<>();   // 期間開始日 -> {日数, 分合計, 円合計}
+        for (Map.Entry<LocalDate, Store.Entry> en : store.all().entrySet()) {
+            LocalDate d = en.getKey();
+            LocalDate ps = d.getDayOfMonth() >= 16 ? d.withDayOfMonth(16) : d.minusMonths(1).withDayOfMonth(16);
+            int[] a = agg.computeIfAbsent(ps, k -> new int[3]);
+            a[0]++; a[1] += en.getValue().minutes(); a[2] += en.getValue().yen();
+        }
+        if (agg.isEmpty()) {
+            root.addView(tv("\nまだデータがありません。", 16, Color.DKGRAY, Gravity.START));
+            return;
+        }
+        // 新しい期間から最大12件
+        java.util.List<LocalDate> keys = new java.util.ArrayList<>(agg.keySet());
+        int from = Math.max(0, keys.size() - 12);
+        keys = keys.subList(from, keys.size());
+        int n = keys.size();
+        double[] sumYen = new double[n], avgYen = new double[n], sumMin = new double[n], avgMin = new double[n];
+        String[] lab = new String[n], tSumYen = new String[n], tAvgYen = new String[n], tSumMin = new String[n], tAvgMin = new String[n];
+
+        for (int i = 0; i < n; i++) {
+            LocalDate ps = keys.get(i);
+            LocalDate pe = ps.plusMonths(1).withDayOfMonth(15);
+            int[] a = agg.get(ps);
+            sumYen[i] = a[2]; avgYen[i] = a[2] / (double) a[0];
+            sumMin[i] = a[1]; avgMin[i] = a[1] / (double) a[0];
+            lab[i] = ps.getMonthValue() + "/16";
+            tSumYen[i] = Store.fmtYen(a[2]); tAvgYen[i] = Store.fmtYen((int) Math.round(avgYen[i]));
+            tSumMin[i] = Store.fmtTime(a[1]); tAvgMin[i] = Store.fmtTime((int) Math.round(avgMin[i]));
+        }
+        // 一覧(新しい期間が上)
+        for (int i = n - 1; i >= 0; i--) {
+            LocalDate ps = keys.get(i), pe = ps.plusMonths(1).withDayOfMonth(15);
+            int[] a = agg.get(ps);
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(dp(12), dp(8), dp(12), dp(8));
+            card.setBackgroundColor(0xFFF3F0FF);
+            card.addView(tv(ps.getYear() + "年" + ps.getMonthValue() + "/16 〜 " + pe.getMonthValue() + "/15  (" + a[0] + "日)", 15, Color.BLACK, Gravity.START));
+            card.addView(tv("営業収入  合計 " + tSumYen[i] + " 円  /  平均 " + tAvgYen[i] + " 円", 14, Color.DKGRAY, Gravity.START));
+            card.addView(tv("拘束時間  合計 " + tSumMin[i] + "  /  平均 " + tAvgMin[i], 14, Color.DKGRAY, Gravity.START));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+            lp.topMargin = dp(8);
+            root.addView(card, lp);
+        }
+        addChart("営業収入 合計(円)", sumYen, tSumYen, lab, 0xFF7C5AF0);
+        addChart("営業収入 平均(円/日)", avgYen, tAvgYen, lab, 0xFFE0559B);
+        addChart("拘束時間 合計", sumMin, tSumMin, lab, 0xFF2E9E8F);
+        addChart("拘束時間 平均(1日)", avgMin, tAvgMin, lab, 0xFFF29D38);
+    }
+
+    private void addChart(String title, double[] v, String[] vt, String[] lab, int color) {
+        TextView t = tv(title, 15, Color.BLACK, Gravity.START);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
+        tp.topMargin = dp(20);
+        root.addView(t, tp);
+        root.addView(new BarChart(this, v, vt, lab, color), new LinearLayout.LayoutParams(-1, dp(170)));
     }
 
     // ---- 撮影 ----

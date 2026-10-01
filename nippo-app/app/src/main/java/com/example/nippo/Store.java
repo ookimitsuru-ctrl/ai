@@ -55,6 +55,15 @@ public class Store {
         return new Entry(m);
     }
 
+    /** 保存済みの全日報(日付順)。 */
+    public java.util.TreeMap<LocalDate, Entry> all() {
+        java.util.TreeMap<LocalDate, Entry> m = new java.util.TreeMap<>();
+        for (String k : sp.getAll().keySet()) {
+            try { LocalDate d = LocalDate.parse(k); Entry e = get(d); if (e != null) m.put(d, e); } catch (Exception ignored) {}
+        }
+        return m;
+    }
+
     /** 最初の記入日(なければ null)。 */
     public LocalDate firstDate() {
         LocalDate first = null;
