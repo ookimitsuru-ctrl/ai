@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         store = new Store(this);
         LocalDate t = LocalDate.now();
-        periodStart = t.getDayOfMonth() >= 16 ? t.withDayOfMonth(16) : t.minusMonths(1).withDayOfMonth(16);
+        periodStart = Period.containing(t).start;
         ScrollView sv = new ScrollView(this);
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -74,7 +74,8 @@ public class MainActivity extends Activity {
     private void render() {
         inStats = false;
         root.removeAllViews();
-        LocalDate end = periodStart.plusMonths(1).withDayOfMonth(15);
+        Period curP = Period.containing(periodStart);
+        LocalDate end = curP.end;
 
         Button menu = new Button(this);
         menu.setText("☰ メニュー");
@@ -98,10 +99,10 @@ public class MainActivity extends Activity {
         LinearLayout nav = new LinearLayout(this);
         nav.setGravity(Gravity.CENTER_VERTICAL);
         Button prev = new Button(this); prev.setText("◀");
-        prev.setOnClickListener(v -> { periodStart = periodStart.minusMonths(1); render(); });
+        prev.setOnClickListener(v -> { periodStart = curP.prev().start; render(); });
         Button next = new Button(this); next.setText("▶");
-        next.setOnClickListener(v -> { periodStart = periodStart.plusMonths(1); render(); });
-        TextView title = tv(periodStart.getMonthValue() + "/16 〜 " + end.getMonthValue() + "/15  (" + end.getYear() + ")",
+        next.setOnClickListener(v -> { periodStart = curP.next().start; render(); });
+        TextView title = tv(curP.label() + "\n(" + curP.range() + ")",
                 16, Color.BLACK, Gravity.CENTER);
         nav.addView(prev);
         nav.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
@@ -176,12 +177,12 @@ public class MainActivity extends Activity {
         back.setText("◀ カレンダーに戻る");
         back.setOnClickListener(v -> render());
         root.addView(back);
-        root.addView(tv("月別集計(16日〜翌15日)", 18, Color.BLACK, Gravity.START));
+        root.addView(tv("月別集計(○月度)", 18, Color.BLACK, Gravity.START));
 
         java.util.TreeMap<LocalDate, int[]> agg = new java.util.TreeMap<>();   // 期間開始日 -> {日数, 分合計, 円合計}
         for (Map.Entry<LocalDate, Store.Entry> en : store.all().entrySet()) {
             LocalDate d = en.getKey();
-            LocalDate ps = d.getDayOfMonth() >= 16 ? d.withDayOfMonth(16) : d.minusMonths(1).withDayOfMonth(16);
+            LocalDate ps = Period.containing(d).start;
             int[] a = agg.computeIfAbsent(ps, k -> new int[3]);
             a[0]++; a[1] += en.getValue().minutes(); a[2] += en.getValue().yen();
         }
@@ -199,23 +200,24 @@ public class MainActivity extends Activity {
 
         for (int i = 0; i < n; i++) {
             LocalDate ps = keys.get(i);
-            LocalDate pe = ps.plusMonths(1).withDayOfMonth(15);
+            Period pr = Period.containing(ps);
             int[] a = agg.get(ps);
             sumYen[i] = a[2]; avgYen[i] = a[2] / (double) a[0];
             sumMin[i] = a[1]; avgMin[i] = a[1] / (double) a[0];
-            lab[i] = ps.getMonthValue() + "/16";
+            lab[i] = pr.month + "月度";
             tSumYen[i] = Store.fmtYen(a[2]); tAvgYen[i] = Store.fmtYen((int) Math.round(avgYen[i]));
             tSumMin[i] = Store.fmtTime(a[1]); tAvgMin[i] = Store.fmtTime((int) Math.round(avgMin[i]));
         }
         // 一覧(新しい期間が上)
         for (int i = n - 1; i >= 0; i--) {
-            LocalDate ps = keys.get(i), pe = ps.plusMonths(1).withDayOfMonth(15);
+            LocalDate ps = keys.get(i);
+            Period pr = Period.containing(ps);
             int[] a = agg.get(ps);
             LinearLayout card = new LinearLayout(this);
             card.setOrientation(LinearLayout.VERTICAL);
             card.setPadding(dp(12), dp(8), dp(12), dp(8));
             card.setBackgroundColor(0xFFF3F0FF);
-            card.addView(tv(ps.getYear() + "年" + ps.getMonthValue() + "/16 〜 " + pe.getMonthValue() + "/15  (" + a[0] + "日)", 15, Color.BLACK, Gravity.START));
+            card.addView(tv(pr.label() + "  (" + pr.range() + ")  " + a[0] + "日", 15, Color.BLACK, Gravity.START));
             card.addView(tv("営業収入  合計 " + tSumYen[i] + " 円  /  平均 " + tAvgYen[i] + " 円", 14, Color.DKGRAY, Gravity.START));
             card.addView(tv("拘束時間  合計 " + tSumMin[i] + "  /  平均 " + tAvgMin[i], 14, Color.DKGRAY, Gravity.START));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
@@ -330,7 +332,7 @@ public class MainActivity extends Activity {
                         m.put(Fields.INCOME, yv);
                         m.put(Fields.OCR, p.raw);
                         store.put(nd, new Store.Entry(m));
-                        periodStart = nd.getDayOfMonth() >= 16 ? nd.withDayOfMonth(16) : nd.minusMonths(1).withDayOfMonth(16);
+                        periodStart = Period.containing(nd).start;
                         render();
                     } catch (Exception ex) {
                         Toast.makeText(this, "入力形式が正しくありません", Toast.LENGTH_LONG).show();
@@ -397,7 +399,7 @@ public class MainActivity extends Activity {
                         }
                         if (e.f.get(Fields.OCR) != null) m.put(Fields.OCR, e.f.get(Fields.OCR));
                         store.put(nd, new Store.Entry(m));
-                        periodStart = nd.getDayOfMonth() >= 16 ? nd.withDayOfMonth(16) : nd.minusMonths(1).withDayOfMonth(16);
+                        periodStart = Period.containing(nd).start;
                         render();
                     } catch (Exception ex) {
                         Toast.makeText(this, "入力形式が正しくありません", Toast.LENGTH_LONG).show();

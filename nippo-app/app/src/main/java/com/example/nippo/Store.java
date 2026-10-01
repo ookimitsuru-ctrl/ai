@@ -76,10 +76,10 @@ public class Store {
         return first;
     }
 
-    /** データのある日だけ、カレンダー1ページ(16日〜翌15日)ごとに 1 から日付順の連番。データのない日は 0。 */
+    /** データのある日だけ、カレンダー1ページ(○月度)ごとに 1 から日付順の連番。データのない日は 0。 */
     public int serial(LocalDate d) {
         if (!sp.contains(d.toString())) return 0;
-        LocalDate start = d.getDayOfMonth() >= 16 ? d.withDayOfMonth(16) : d.minusMonths(1).withDayOfMonth(16);
+        LocalDate start = Period.containing(d).start;
         int n = 0;
         for (String k : sp.getAll().keySet()) {
             try {

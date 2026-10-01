@@ -64,15 +64,17 @@ public class AppTest {
         Context c = RuntimeEnvironment.getApplication();
         Store s = new Store(c);
         LocalDate t = LocalDate.now();
-        LocalDate ps = t.getDayOfMonth() >= 16 ? t.withDayOfMonth(16) : t.minusMonths(1).withDayOfMonth(16);
+        Period cp = Period.containing(t);
+        LocalDate ps = cp.start;
         s.put(ps.plusDays(1), entry("18:11", "70850"));
         s.put(ps.plusDays(3), entry("10:00", "50000"));
-        s.put(ps.minusMonths(1).plusDays(2), entry("12:30", "60000"));
+        s.put(cp.prev().start.plusDays(2), entry("12:30", "60000"));
 
         MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
         View root = a.findViewById(android.R.id.content);
         List<String> tx = allTexts(root);
         System.out.println("CALENDAR TEXTS: " + tx);
+        assertTrue(tx.stream().anyMatch(x -> x.contains(cp.label())));              // 「○月度」表示
         assertTrue(tx.contains("📷 日報を撮影して取り込み"));
         assertTrue(tx.contains("🖼 写真から取り込み"));
         assertTrue(tx.contains("☰ メニュー"));
@@ -110,6 +112,7 @@ public class AppTest {
         assertTrue(st.stream().anyMatch(x -> x.contains("拘束時間  合計 28:11  /  平均 14:06")));
         assertTrue(st.stream().anyMatch(x -> x.contains("営業収入  合計 60,000 円  /  平均 60,000 円")));
         assertTrue(st.stream().anyMatch(x -> x.contains("拘束時間  合計 12:30  /  平均 12:30")));
+        assertTrue(st.stream().anyMatch(x -> x.contains(cp.label()) && x.contains(cp.range())));
         assertTrue(st.contains("営業収入 合計(円)") && st.contains("拘束時間 平均(1日)"));
     }
 }
