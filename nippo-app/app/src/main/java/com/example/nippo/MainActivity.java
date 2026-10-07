@@ -3,6 +3,7 @@ package com.example.nippo;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -19,13 +20,17 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.provider.MediaStore;
 import androidx.core.content.FileProvider;
+import com.google.android.gms.tasks.Tasks;
 import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.Text;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions;
 import java.io.File;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends Activity {
@@ -95,6 +100,7 @@ public class MainActivity extends Activity {
         pick.setText("🖼 写真から取り込み");
         pick.setOnClickListener(v -> startPick());
         root.addView(pick);
+        root.addView(tv("撮影のコツ: 明るい所で、日報全体が入るように真上から。影や反射が文字にかからないように。", 12, Color.GRAY, Gravity.START));
 
         LinearLayout nav = new LinearLayout(this);
         nav.setGravity(Gravity.CENTER_VERTICAL);
@@ -279,23 +285,51 @@ public class MainActivity extends Activity {
         recognize(Uri.fromFile(photoFile), true);
     }
 
-    /** 画像を読み取る。撮影した写真(deleteAfter=true)は処理後に削除、選んだ写真は残す。 */
+    /**
+     * 画像を読み取る。撮影した写真(deleteAfter=true)は処理後に削除、選んだ写真は残す。
+     * 1回目は写真全体、2回目は左欄を切り出して拡大・白黒強調した画像を読み、検算して値を決める。
+     */
     private void recognize(Uri uri, boolean deleteAfter) {
-        Toast.makeText(this, "読み取り中…", Toast.LENGTH_SHORT).show();
-        try {
-            if (recognizer == null) recognizer = TextRecognition.getClient(new JapaneseTextRecognizerOptions.Builder().build());
-            InputImage img = InputImage.fromFilePath(this, uri);
-            recognizer.process(img)
-                .addOnSuccessListener(t -> { Parser p = Parser.parse(t); if (deleteAfter) deletePhoto(); confirm(p); })
-                .addOnFailureListener(e -> {
-                    if (deleteAfter) deletePhoto();
-                    Toast.makeText(this, "読み取り失敗: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    confirm(new Parser());
-                });
-        } catch (Exception e) {
-            if (deleteAfter) deletePhoto();
-            Toast.makeText(this, "画像を開けません", Toast.LENGTH_LONG).show();
-        }
+        AlertDialog progress = new AlertDialog.Builder(this)
+                .setMessage("読み取り中…(2回読み取って検算しています)")
+                .setCancelable(false)
+                .show();
+        if (recognizer == null) recognizer = TextRecognition.getClient(new JapaneseTextRecognizerOptions.Builder().build());
+        final TextRecognizer rec = recognizer;
+        new Thread(() -> {
+            Reader.Result res = null;
+            String err = null;
+            try {
+                Bitmap full = ImageUtil.load(this, uri, 4096);
+                List<Parser> passes = new ArrayList<>();
+                Text t1 = Tasks.await(rec.process(InputImage.fromBitmap(full, 0)));
+                Parser p1 = Parser.parse(MlKitOcr.toPage(t1, full.getWidth(), full.getHeight()));
+                passes.add(p1);
+                try {
+                    Bitmap crop = ImageUtil.cropForSecondPass(full, p1.leftColumn, p1.charHeight);
+                    Text t2 = Tasks.await(rec.process(InputImage.fromBitmap(crop, 0)));
+                    passes.add(Parser.parse(MlKitOcr.toPage(t2, crop.getWidth(), crop.getHeight())));
+                    crop.recycle();
+                } catch (Exception ignored) {
+                    // 2回目に失敗しても1回目の結果で続ける
+                }
+                full.recycle();
+                res = Reader.combine(passes);
+            } catch (Throwable e) {
+                err = e.getMessage();
+            }
+            final Reader.Result fr = res;
+            final String fe = err;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                progress.dismiss();
+                if (deleteAfter) deletePhoto();
+                if (fr == null) {
+                    Toast.makeText(this, "読み取り失敗: " + fe, Toast.LENGTH_LONG).show();
+                    confirm(Reader.empty());
+                } else confirm(fr);
+            });
+        }).start();
     }
 
     /** 処理が終わった写真は削除する。 */
@@ -305,7 +339,7 @@ public class MainActivity extends Activity {
 
     // ---- 確認・編集 ----
     /** 取り込み確認。全データを保存し、ここでは日付・拘束時間・営業収入だけを表示する。 */
-    private void confirm(Parser p) {
+    private void confirm(Reader.Result p) {
         LocalDate d = null;
         try { if (p.year != null) d = LocalDate.of(p.year, p.month, p.day); } catch (Exception ignored) {}
         final LocalDate date0 = d != null ? d : LocalDate.now();
@@ -315,7 +349,11 @@ public class MainActivity extends Activity {
         EditText date = field("日付 (yyyy-MM-dd)", date0.toString(), InputType.TYPE_CLASS_DATETIME);
         EditText time = field("拘束時間 (例 18:11)", p.fields.getOrDefault(Fields.MINUTES, ""), InputType.TYPE_CLASS_DATETIME);
         EditText yen = field("営業収入 (円)", p.fields.getOrDefault(Fields.INCOME, ""), InputType.TYPE_CLASS_NUMBER);
-        l.addView(date); l.addView(time); l.addView(yen);
+        l.addView(date);
+        l.addView(time);
+        l.addView(status(p.kousoku));
+        l.addView(yen);
+        l.addView(status(p.income));
         new AlertDialog.Builder(this)
                 .setTitle("取り込み内容の確認")
                 .setView(l)
@@ -340,6 +378,14 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("キャンセル", null)
                 .show();
+    }
+
+    /** 検算結果の表示(緑=検算一致、橙=要確認)。 */
+    private TextView status(Reader.Check c) {
+        int color = c.level == Reader.OK_CALC ? 0xFF2E7D32 : c.level == Reader.OK_READ ? 0xFF1565C0 : 0xFFE65100;
+        TextView t = tv(c.note, 13, color, Gravity.START);
+        t.setPadding(dp(4), 0, 0, dp(10));
+        return t;
     }
 
     /** 日付をタップしたとき、保存した日報の全項目を表示する。 */

@@ -67,7 +67,7 @@ public class ParserTest {
         row("合計", "77,940 円");
         row("合計金額", "630円");              // ETCの合計は拾わない
         row("最高速度", "95 Km/h");
-        Parser p = Parser.parse(text("運転者営業日報(点呼用) 2026年9月29日(火)"));
+        Parser p = Parser.parse(MlKitOcr.toPage(text("運転者営業日報(点呼用) 2026年9月29日(火)"), 1000, 2000));
         assertEquals(Integer.valueOf(2026), p.year);
         assertEquals(Integer.valueOf(9), p.month);
         assertEquals(Integer.valueOf(29), p.day);
@@ -75,7 +75,7 @@ public class ParserTest {
         assertEquals("70850", p.fields.get("営業収入"));
         assertEquals("4:33", p.fields.get("全休憩時間"));
         assertEquals("274", p.fields.get("全走行距離"));
-        assertEquals("643", p.fields.get("顧後回数"));
+        assertEquals("643", p.fields.get("爾後回数"));
         assertEquals("77940", p.fields.get("合計"));
         assertEquals("71540", p.fields.get("運賃"));
         assertEquals("95", p.fields.get("最高速度"));
@@ -86,7 +86,7 @@ public class ParserTest {
     public void parsesSameLineValue() {
         line("拘束時間 18:11", 60, 300); y += 40;
         line("営業収入 70,850 円", 60, 300);
-        Parser p = Parser.parse(text("2026年9月29日"));
+        Parser p = Parser.parse(MlKitOcr.toPage(text("2026年9月29日"), 1000, 2000));
         assertEquals("18:11", p.fields.get("拘束時間"));
         assertEquals("70850", p.fields.get("営業収入"));
     }

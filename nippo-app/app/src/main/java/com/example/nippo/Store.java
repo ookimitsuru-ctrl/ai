@@ -45,6 +45,7 @@ public class Store {
             if (v.startsWith("{")) {
                 JSONObject o = new JSONObject(v);
                 for (Fields.F f : Fields.ALL) if (o.has(f.label)) m.put(f.label, o.getString(f.label));
+                if (o.has("顧後回数") && !m.containsKey("爾後回数")) m.put("爾後回数", o.getString("顧後回数"));   // 旧名
                 if (o.has(Fields.OCR)) m.put(Fields.OCR, o.getString(Fields.OCR));
             } else {                                   // 旧形式 "分|円"
                 String[] p = v.split("\\|");

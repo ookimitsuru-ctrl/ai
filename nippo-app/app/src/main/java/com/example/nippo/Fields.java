@@ -25,7 +25,7 @@ public class Fields {
         new F("実車走行距離", NUM, "Km"),
         new F("空転走行距離", NUM, "Km"),
         new F("営業回数", NUM, "回"),
-        new F("顧後回数", NUM, "回", "爾後回数", "顧後回数"),
+        new F("爾後回数", NUM, "回", "顧後回数"),
         new F("迎車回数", NUM, "回"),
         new F("障割回数", NUM, "回"),
         new F("ワゴン回数", NUM, "回"),

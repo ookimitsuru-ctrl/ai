@@ -115,4 +115,22 @@ public class AppTest {
         assertTrue(st.stream().anyMatch(x -> x.contains(cp.label()) && x.contains(cp.range())));
         assertTrue(st.contains("営業収入 合計(円)") && st.contains("拘束時間 平均(1日)"));
     }
+
+    @Test
+    public void confirmDialogShowsVerification() throws Exception {
+        MainActivity a = Robolectric.buildActivity(MainActivity.class).setup().get();
+        Reader.Result r = Reader.combine(java.util.Collections.singletonList(
+                Parser.parse(TsvOcr.load("doc0929_full_psm4.tsv"))));
+        java.lang.reflect.Method m = MainActivity.class.getDeclaredMethod("confirm", Reader.Result.class);
+        m.setAccessible(true);
+        m.invoke(a, r);
+        AlertDialog d = ShadowAlertDialog.getLatestAlertDialog();
+        List<String> dt = allTexts(d.getWindow().getDecorView());
+        System.out.println("CONFIRM TEXTS: " + dt);
+        assertTrue(dt.contains("2026-09-29"));
+        assertTrue(dt.contains("18:11"));
+        assertTrue(dt.contains("70850"));
+        assertTrue(dt.stream().anyMatch(x -> x.startsWith("✔ 検算一致") && x.contains("帰庫−出庫")));
+        assertTrue(dt.stream().anyMatch(x -> x.startsWith("✔ 検算一致") && x.contains("合計−税金額")));
+    }
 }
