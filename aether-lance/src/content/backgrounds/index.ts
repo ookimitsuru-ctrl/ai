@@ -2,6 +2,7 @@ import type { World } from '../../game/world';
 import { orbitBackground } from './orbit';
 import { caveBackground } from './cave';
 import { hiveBackground } from './hive';
+import { stormBackground } from './storm';
 import { StarField } from './common';
 import { PAL } from '../../render/palette';
 
@@ -15,6 +16,7 @@ export const BACKGROUNDS: Record<string, (w: World) => Background> = {
   orbit: (w) => orbitBackground(w),
   cave: (w) => caveBackground(w),
   hive: (w) => hiveBackground(w),
+  storm: (w) => stormBackground(w),
   space: () => {
     const s = new StarField(3);
     return { draw(g, w) { g.fillStyle = PAL.N0; g.fillRect(0, 0, 480, 270); s.draw(g, w.bgX, w.bgY, w.frame); } };

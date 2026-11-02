@@ -119,11 +119,11 @@ defEnemy({
   id: 'matriarch', hp: 1, score: 70000, size: 'B', shape: box(10, 10), flags: EF.PERSISTENT | EF.BOSS | EF.INVULN, timeLimit: 150 * 60, bossName: 'MATRIARCH', explosion: 'organic',
   init(e, c) {
     e.noOffscreenKill = true;
-    const eye = c.part('eye', 0, 0, circle(15), 3600, { armored: true, score: 0, contact: false });
+    const eye = c.part('eye', 0, 0, circle(15), 3000, { armored: true, score: 0, contact: false });
     eye.onDestroy = () => c.killBoss(150);
     for (let k = 0; k < 4; k++) c.part('pet' + k, 0, 0, box(40, 26), 1e9, { armored: true, score: 3000 });
     e.o.contact = [box(96, 128, 0, 0)];
-    e.o.armorShapes = [box(96, 128, 0, 0)];
+    e.o.armorShapes = [box(96, 48, 0, -40), box(96, 48, 0, 40), box(40, 128, 30, 0)];
     e.o.bw = 130; e.o.bh = 150;
     e.v.pa = 0; e.v.open = 0; e.v.detached = 0; e.v.ocx = 300; e.v.ocy = 135;
     e.o.deathFx = (k: number) => { if (fxRng.next() < 0.5) c.w.fx.drops(e.x + (fxRng.next() - 0.5) * 100, e.y + (fxRng.next() - 0.5) * 120, 10, [PAL.T3, PAL.G3, PAL.F3, PAL.G4]); void k; };

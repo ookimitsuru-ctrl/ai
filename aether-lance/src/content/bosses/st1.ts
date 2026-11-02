@@ -112,6 +112,8 @@ defEnemy({
 
 // ---- B1 WARDEN --------------------------------------------------------------------------------------------
 const HULL = [box(186, 52, 8, 0), box(110, 72, 14, 0), box(40, 18, -86, 0)];
+// armour leaves a channel in front of the core (y -12..+14) so shots can reach the shutter/core
+const HULL_ARMOR = [box(186, 18, 8, -17), box(186, 18, 8, 19), box(110, 20, 14, -26), box(110, 20, 14, 26), box(60, 26, 70, 1)];
 
 function* wardenPhase2(e: Enemy, c: Ctx) {
   for (let f = 0; f <= 5; f++) { e.v.shut = f; yield 10; }
@@ -156,13 +158,13 @@ defEnemy({
   init(e, c) {
     e.noOffscreenKill = true;
     c.part('prow', -86, 0, box(26, 14), 250, { score: 3000 });
-    c.part('hatchU', -11, -17, box(34, 12), 300, { score: 3000 });
-    c.part('hatchL', -11, 19, box(34, 12), 300, { score: 3000 });
+    c.part('hatchU', -11, -17, box(34, 12), 240, { score: 3000 });
+    c.part('hatchL', -11, 19, box(34, 12), 240, { score: 3000 });
     c.part('tur1', 4, -36, box(12, 8), 80, { score: 2000 });
     c.part('tur2', 40, -34, box(12, 8), 80, { score: 2000 });
-    c.part('core', 44, 1, circle(10), 1200, { armored: true, score: 0, contact: false });
+    c.part('core', 44, 1, circle(11), 950, { armored: true, score: 0, contact: false });
     e.o.contact = HULL;
-    e.o.armorShapes = HULL;
+    e.o.armorShapes = HULL_ARMOR;
     e.o.bw = 200; e.o.bh = 90;
     e.v.shut = 0; e.v.hatchU = 0; e.v.hatchL = 0;
     P(e, 'core').onDestroy = () => c.killBoss(150);

@@ -11,7 +11,16 @@ export function botInput(w: World): InputFrame {
   let target: { x: number; y: number } | null = null;
   let best = 1e9;
   for (const e of w.enemies.items) {
-    if (!e.active || e.dead || e.x < p.x + 20 || e.x > 470) continue;
+    if (!e.active || e.dead) continue;
+    if (e.parts) {
+      for (const pt of e.parts) {
+        if (!pt.alive || pt.armored || pt.maxHp >= 1e6 || pt.x < p.x + 20 || pt.x > 476 || pt.y < 10 || pt.y > 260) continue;
+        const d = Math.abs(pt.y - p.y) * 0.5 + (pt.x - p.x) * 0.2 - (pt.id === 'head' || pt.id === 'core' || pt.id === 'eye' ? 40 : 0);
+        if (d < best) { best = d; target = pt; }
+      }
+      continue;
+    }
+    if (e.x < p.x + 20 || e.x > 470) continue;
     const d = Math.abs(e.y - p.y) + (e.x - p.x) * 0.3;
     if (d < best) { best = d; target = e; }
   }

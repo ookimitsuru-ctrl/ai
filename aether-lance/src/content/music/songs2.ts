@@ -66,4 +66,27 @@ export const st3: SongDef = {
   sends: { lead: { rev: 0.2, del: 0.12 } },
 };
 
+// ---- STAGE 4: Tempest Crown (A minor, 180) ----
+const A4 = ['Am', 'F', 'G', 'Em', 'Am', 'F', 'G', 'Em'];
+const B4 = ['F', 'G', 'Am', 'Am', 'F', 'G', 'E', 'E'];
+const R4: Record<string, [string, number]> = { Am: ['a', 1], F: ['f', 1], G: ['g', 1], Em: ['e', 2], E: ['e', 2] };
+export const st4: SongDef = {
+  id: 'st4', title: 'Tempest Crown', bpm: 180,
+  tracks: {
+    lead: `t180 @lead_saw v12 q7 l8
+      r1 r1 r1 o5 e8 a8 o6 c8 e8 a4 g+4
+      L
+      o6 a4. g8 e4 c8 e8 | o6 f4. e8 c4 o5 a8 o6 c8 | o6 d4. c8 o5 b4 g8 b8 | o5 e2 g4 b4 |
+      o6 a4. b8 o7 c4 o6 b8 a8 | o6 a4 f8 a8 o7 c4 d8 c8 | o6 b4. a8 g4 d8 g8 | o6 e2. r4 |
+      o6 c4 c8 d8 e4 f8 e8 | o6 d4 d8 e8 f4 g8 f8 | o6 e4 a8 g8 e4 c8 e8 | o6 a2. r4 |
+      o6 f4 a8 o7 c8 f4 e8 c8 | o6 g4 b8 o7 d8 g4 f8 d8 | o6 e4 g+8 b8 o7 e4 d8 o6 b8 | o6 g+2 b4 o7 e4 |`,
+    arp: `@arp v7 ${arpC('Am', 4)} ${arpC('F', 4)} ${arpC('G', 4)} ${arpC('E', 4)} L ${[...A4, ...B4].map((c) => arpC(c, 4)).join(' ')}`,
+    pad: `@pad v8 ${padC('Am')} ${padC('F')} ${padC('G')} ${padC('E')} L ${[...A4, ...B4].map((c) => padC(c)).join(' ')}`,
+    bass: `@bass_pulse v13 q6 ${['a', 'f', 'g', 'e'].map((r) => bass8(r, r === 'e' ? 2 : 1)).join(' ')} L ${[...A4, ...B4].map((c) => bass8(R4[c]![0], R4[c]![1])).join(' ')}`,
+    drums: `@drums v12 ${rep('{c f+}8 f+8 {d f+}8 {c f+}8 f+8 {c f+}8 {d f+}8 f+8', 3)} ${'{c f+}8 d8 d8 d8 e16 e16 e16 e16 {d+ b}4'} L ${rep('{c f+}8 f+8 {d f+}8 {c f+}8 f+8 {c f+}8 {d f+}8 f+8', 7)} {c f+}8 d8 d8 d8 e16 e16 e16 e16 {d+ b}4 ${rep('{c f+}8 f+8 {d f+}8 {c f+}8 f+8 {c f+}8 {d f+}8 f+8', 7)} {c f+}8 d8 d8 d8 e16 e16 e16 e16 {d+ b}4`,
+    drive: `@drums v8 r1 r1 r1 r1 L ${rep('a+8 c+8 a+8 c+8 a+8 c+8 a+8 c+8', 16)}`,
+  },
+  drive: ['drive'],
+};
+
 export const _cs = { CH, bass8 };
