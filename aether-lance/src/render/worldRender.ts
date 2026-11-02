@@ -485,11 +485,15 @@ export class WorldView {
           g.globalAlpha = 1;
           break;
         case 'band': {
-          g.fillStyle = rgba('O4', 0.12 + k * 0.18);
+          // orange = danger zone (default); a band given another colour (e.g. G4) marks a SAFE zone, such as the gap
+          // the stage 5 boss leaves when its plates close (v1.1.1: the colour used to be ignored, so the safe gap
+          // looked exactly like the press warnings in the same stage)
+          const custom = t.color !== 'O5' && t.color in PAL;
+          g.fillStyle = rgba((custom ? t.color : 'O4') as PalKey, 0.12 + k * 0.18);
           const y0 = Math.min(t.y1, t.y2), hh = Math.abs(t.y2 - t.y1);
           const x0 = Math.min(t.x1, t.x2), ww = Math.abs(t.x2 - t.x1) || 480;
           g.fillRect(Math.round(x0), Math.round(y0), Math.round(ww), Math.round(hh));
-          g.fillStyle = rgba('O5', 0.35 + k * 0.4);
+          g.fillStyle = rgba((custom ? t.color : 'O5') as PalKey, 0.35 + k * 0.4);
           for (let xx = Math.round(x0) - ((w.frame * 2) % 16); xx < x0 + ww; xx += 16) { g.fillRect(xx, Math.round(y0), 6, 1); g.fillRect(xx, Math.round(y0 + hh) - 1, 6, 1); }
           break;
         }

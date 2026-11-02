@@ -89,10 +89,15 @@ function danger(c: Ctx, x: number, y: number, k: number): number {
     switch (t.kind) {
       case 'band': {
         const x0 = Math.min(t.x1, t.x2), x1 = t.x1 === t.x2 ? 480 : Math.max(t.x1, t.x2);
-        hit = hx >= x0 - m && hx <= x1 + m && hy >= Math.min(t.y1, t.y2) - m && hy <= Math.max(t.y1, t.y2) + m;
+        if (t.color !== 'O5') {
+          // a coloured band marks a safe zone (stage 5 boss plates): danger is being outside it
+          const inside = hy >= Math.min(t.y1, t.y2) + m && hy <= Math.max(t.y1, t.y2) - m;
+          hit = !inside && hx >= x0 - m && hx <= x1 + m;
+        } else hit = hx >= x0 - m && hx <= x1 + m && hy >= Math.min(t.y1, t.y2) - m && hy <= Math.max(t.y1, t.y2) + m;
         break;
       }
       case 'line':
+        if (t.color === 'Y4') break; // guide line through the middle of a safe gap, not a laser warning
         if (t.pts) { for (let i = 0; i + 3 < t.pts.length && !hit; i += 2) hit = segDist2(hx, hy, t.pts[i]!, t.pts[i + 1]!, t.pts[i + 2]!, t.pts[i + 3]!) <= (Math.max(5, t.w * 2) + m) ** 2; }
         else hit = segDist2(hx, hy, t.x1, t.y1, t.x2, t.y2) <= (Math.max(5, t.w * 2) + m) ** 2;
         break;

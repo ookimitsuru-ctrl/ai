@@ -74,7 +74,7 @@ export const DRIVE = {
 export const BOSS_DMG = {
   base: 1,
   midboss: [1, 7, 2.2, 3.8, 1, 2.4, 2.7],
-  boss: [1, 4.5, 5.5, 3.6, 3.2, 1.2, 1.4],
+  boss: [1, 6, 5.5, 3.6, 3.2, 1.2, 1.4],
   pulse: 1, fan: 1.8, ray: 1, other: 1,
 };
 

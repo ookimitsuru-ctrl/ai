@@ -150,6 +150,9 @@ a player normally has there) plus boss-fight timing runs found:
 - **SEEKER fed the stage 2 boss's counter-laser.** Seekers homed on a multi-part enemy's centre, which on the GOLEM
   is the chest crystal that absorbs hits and answers with a reflecting laser fan, so carrying SEEKER provoked attacks
   and did no damage. Seekers now home on the nearest part that can take damage.
+- **Safe gap drawn as danger (stage 5 boss).** Before the plates close, the boss marks the gap that stays open with
+  a green band (`G4`), but the band renderer ignored the colour and drew it orange, exactly like the press warnings
+  of the same stage. Bands now use their colour: orange = danger, any other colour = safe zone.
 - **Boss damage per stage** (`BOSS_DMG.midboss` / `.boss`, see balance.ts): the uniform ×3.6 left stage 1 long (the
   first midboss escaped with PULSE Lv1, FAN timed out on the boss) while the late bosses melted in 4–15 s at full
   power. Multipliers are now set so a midboss takes about 10–20 s and a boss about 40–80 s with the usual power, and
