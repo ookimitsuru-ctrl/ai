@@ -15,6 +15,7 @@ import { IB } from './game/player';
 import { newRun } from './app';
 import { pv } from './core/pv';
 import { backdrop } from './scenes/backdrop';
+import { startAutotest } from './scenes/autotest';
 import { SPR } from './content/sprites/registry';
 import { font } from './render/font';
 import { PAL } from './render/palette';
@@ -110,7 +111,9 @@ function boot(): void {
     try {
       buildAllSprites();
     } catch (e) { showError(e); return; }
-    scenes.replaceNow(new BootScene());
+    const params = new URLSearchParams(location.search);
+    if (params.has('autotest')) startAutotest(params); // automated device / balance test
+    else scenes.replaceNow(new BootScene());
     if (location.search.includes('debug')) {
       Object.assign(window as object, {
         __scenes: scenes, __renderer: renderer,

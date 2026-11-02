@@ -53,6 +53,10 @@ export class GameScene implements Scene {
   replayStage = 0;
   /** where a replay returns to when it ends or is interrupted */
   replayExit: (() => Scene) | null = null;
+  /** automated tests (autotest mode): where a spectated run goes when it ends, and per-frame / per-event hooks */
+  onExit: (() => Scene) | null = null;
+  onFrame: ((g: GameScene) => void) | null = null;
+  onWorldEvent: ((g: GameScene, ev: WorldEvent) => void) | null = null;
   bossRushDone = false;
 
   source: ((w: World) => InputFrame) | null = null;
@@ -159,8 +163,9 @@ export class GameScene implements Scene {
     else w.update(inp);
     if (this.debug?.step) this.debug.step = false;
     this.run.frames++;
-    for (const ev of w.events) this.onEvent(ev);
+    for (const ev of w.events) { this.onWorldEvent?.(this, ev); this.onEvent(ev); }
     w.events.length = 0;
+    this.onFrame?.(this);
     if (this.warnT > 0) this.warnT--;
     if (this.cpT > 0) this.cpT--;
     // per-stage render state
@@ -171,11 +176,11 @@ export class GameScene implements Scene {
   }
 
   /** Leave a replay / attract demo. */
-  private endSpectate(): void {
+  endSpectate(): void {
     if (scenes.busy || this.over) return;
     this.over = true;
     audio.stopMusic(0.5);
-    const exit = this.replayExit;
+    const exit = this.replayExit ?? this.onExit;
     scenes.goto(() => (exit ? exit() : new TitleScene()), 30);
   }
 

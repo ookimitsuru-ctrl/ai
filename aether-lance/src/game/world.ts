@@ -22,7 +22,7 @@ export type WorldEvent =
   | { type: 'warning'; name: string }
   | { type: 'bossStart'; name: string }
   | { type: 'checkpoint'; id: string }
-  | { type: 'death' }
+  | { type: 'death'; cause: string }
   | { type: 'extend' }
   | { type: 'section'; name: string }
   | { type: 'vibrate'; ms: number }
@@ -1131,7 +1131,7 @@ export class World {
     const gr2 = PLAYER.grazeR;
     for (const b of this.bullets.items) {
       if (!b.active || b.fade > 0 || b.delay > 0) continue;
-      if (b.kind === 'waveArc') { if (this.arcHits(b, hx, hy, hr)) { this.playerHit(); if (p.state !== 'play') return; } continue; }
+      if (b.kind === 'waveArc') { if (this.arcHits(b, hx, hy, hr)) { this.hitSrc = 'bullet:waveArc'; this.playerHit(); if (p.state !== 'play') return; } continue; }
       if (orbit && (b.kind === 'pellet' || b.kind === 'needle' || b.kind === 'chip')) {
         let ab = false;
         for (let i = 0; i < p.drones; i++) if (dist2(b.x, b.y, p.dx[i]!, p.dy[i]!) < 49) { ab = true; break; }
@@ -1140,7 +1140,7 @@ export class World {
       const d2 = dist2(b.x, b.y, hx, hy);
       const rr = b.r + hr;
       if (d2 <= rr * rr) {
-        if (vul || p.barrier > 0) { if (b.kind !== 'globe') b.active = false; this.playerHit(); if (p.state !== 'play') return; }
+        if (vul || p.barrier > 0) { if (b.kind !== 'globe') b.active = false; this.hitSrc = 'bullet:' + b.kind; this.playerHit(); if (p.state !== 'play') return; }
         continue;
       }
       if (!b.grazed && d2 <= (gr2 + b.r) * (gr2 + b.r)) {
@@ -1169,7 +1169,7 @@ export class World {
     // hazards
     for (const h of this.hazards.items) {
       if (!h.active || h.tele > 0 || !h.lethal) continue;
-      if (this.hazardHits(h, hx, hy, hr)) { this.playerHit(); if (p.state !== 'play') return; }
+      if (this.hazardHits(h, hx, hy, hr)) { this.hitSrc = 'hazard:' + h.kind; this.playerHit(); if (p.state !== 'play') return; }
     }
     // enemy bodies
     for (const e of this.enemies.items) {
@@ -1181,6 +1181,7 @@ export class World {
         if (!hit && extra) for (const sh of extra) if (circleVsShape(hx, hy, hr, e.x, e.y, sh)) { hit = true; break; }
       } else hit = circleVsShape(hx, hy, hr, e.x, e.y, e.shape);
       if (hit) {
+        this.hitSrc = 'contact:' + e.def.id;
         this.playerHit();
         if (p.state !== 'play') return;
         if (!e.parts && !(e.flags & (EF.INVULN | EF.ARMORED)) && e.size === 'S' && p.barrier >= 0) {
@@ -1290,13 +1291,17 @@ export class World {
     return false;
   }
 
+  /** what the last playerHit() came from (telemetry only) */
+  hitSrc = 'hit';
+
   /** Player hit by something lethal. */
   playerHit(): void {
     const p = this.player;
     if (p.state !== 'play' || p.godMode) return;
     if (p.invuln > 0 || p.driving && p.invuln > 0) return;
     if (p.barrier > 0) { this.barrierHit(); return; }
-    this.killPlayer('hit');
+    this.killPlayer(this.hitSrc);
+    this.hitSrc = 'hit';
   }
 
   barrierHit(): void {
@@ -1313,7 +1318,7 @@ export class World {
     }
   }
 
-  killPlayer(_cause: string): void {
+  killPlayer(cause: string): void {
     const p = this.player;
     if (p.state !== 'play' || p.godMode) return;
     if (this.phase === 'bossDying' || this.phase === 'clear') return;
@@ -1325,7 +1330,7 @@ export class World {
     this.flash(0.35, '#d4f7ff');
     this.sfx('player_die', p.x);
     this.music({ cmd: 'duck', db: -6, sec: 1 });
-    this.events.push({ type: 'death' }, { type: 'vibrate', ms: 60 });
+    this.events.push({ type: 'death', cause }, { type: 'vibrate', ms: 60 });
     this.fx.explosion(p.x, p.y, 'large');
     this.fx.shards(p.x, p.y, 20, [PAL.C4, PAL.N8, PAL.N6, PAL.C3], 3);
     this.fx.ring(p.x, p.y, 50, PAL.C4, 18, 3);
