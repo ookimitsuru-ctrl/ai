@@ -55,10 +55,11 @@ Twelve shots cut on bar lines (150 BPM, 96 frames per bar), with the drive-layer
 
 ## Testing
 
-- `npm test` (Vitest, 47 tests):
+- `npm test` (Vitest, 72 tests):
   - `music.test.ts` — MML parsing, repeats, every song's tracks are the same length and a whole number of bars.
   - `sim.test.ts` — the autopilot clears every stage headlessly; two runs with the same input give the same state hash.
   - `bosses.test.ts` — every midboss and boss can actually be destroyed (regression for unreachable weak points).
+  - `respawn.test.ts` — in stage 5's vertical shaft the ship respawns clear of the walls for the whole entry and invulnerability.
   - `replay.test.ts` — replay encoding round-trips exactly; a recorded mortal run (keyboard + touch input) replays to the same state.
   - `font.test.ts` — the bundled font subset covers every character in `src/`.
 - `npm run e2e` (Playwright, against `dist/` and `dist-single/`): boot / title, start a game and score, pause / resume,
