@@ -1,34 +1,72 @@
 # AETHER LANCE — implementation notes
 
-Spec: `docs/` (README → 01..11). This file tracks how the code maps to it and any deviations.
+Spec: `docs/` (README → 01..11). This file maps the code to the spec and lists every intentional deviation.
+Player-facing instructions are in `README.md`.
+
+## Status
+
+Complete (v1.0.0). All MUST items and nearly all SHOULD items of the spec are implemented:
+
+- 6 stages, 6 midbosses and 6 bosses (THE CHOIR has 3 forms), loop 2, true ending, continues, checkpoints.
+- PULSE / FAN / RAY Lv1–5, GRAVITY BOMB / SEEKER, WISP drones in 3 formations, AEGIS, Lance Drive, rank, 4 difficulties.
+- ARCADE, PRACTICE (any reached stage / checkpoint / loadout), BOSS RUSH (unlocks after a clear), ranking with name entry.
+- Replays: every arcade / boss-rush run is recorded, and the #1 run of each board is stored and can be watched from the ranking.
+- All music (15 MML songs incl. drive layers and jingles) and SFX are synthesised in WebAudio; all graphics are generated in code.
+- Options: language (JA/EN), key and pad bindings, scaling / CRT / bloom / quality, volumes and sound test,
+  accessibility (shake, flash reduction, bullet emphasis, hitbox, background dim, game speed), save export / import.
+- Touch controls (relative drag, DRIVE / FORM / pause buttons, left-handed layout), gamepad, PWA (offline), single-file build,
+  GitHub Actions workflow (tests, builds, single-HTML artifact, Pages deploy from the default branch).
 
 ## Layout
-- `src/core` — loop helpers, input (keyboard/pad/touch → actions), deterministic math (`dmath`), RNG, scenes, save.
-- `src/render` — palette, sprite builder (auto-shaded pixel art `SB`), bitmap fonts, WebGL2 post (bloom/CRT/shockwaves) + Canvas2D fallback, world renderer, HUD, terrain painter.
-- `src/audio` — MML parser, WebAudio instruments, look-ahead sequencer, offline-synthesised SFX, engine.
-- `src/game` — World (fixed update order), player/weapons/drones, terrain bitmap, script context (coroutines + bullet patterns), FX, bot.
+
+- `src/core` — input (keyboard / pad / touch → actions), deterministic math (`dmath`), RNG, scene stack, save data.
+- `src/render` — palette, sprite builder (auto-shaded pixel art `SB`), bitmap font, WebGL2 post (bloom / CRT / shockwaves / heat haze)
+  with a Canvas2D fallback, hi-res overlay canvas for Japanese text, world renderer, HUD, terrain painter.
+- `src/audio` — MML parser, WebAudio instruments, look-ahead sequencer (beat sync via `syncTo`), synthesised SFX, engine.
+- `src/game` — World (fixed update order), player / weapons / drones, terrain bitmap, script context (generator coroutines +
+  bullet patterns), FX, autopilot bot, replay encoding.
 - `src/content` — sprites, enemies, bosses, stages, backgrounds, music (all procedural / code-authored).
-- `src/scenes` — boot/title/menus, game, pause, options/keyconfig, practice, records, ending, demo, debug.
+- `src/scenes` — boot / title / menus, game, pause, options / key config, practice, records (name entry, ranking, credits),
+  ending, attract demo, debug.
 
 ## Testing
-- `npm test` — vitest: MML/song alignment, headless stage simulation (autopilot clears each stage; determinism hash).
-- `?debug=1` — debug overlay; keys: ` overlay, H hitboxes, I god, M max power, F1-F6 stage, N midboss, B boss/kill part, PgDn next checkpoint, O pause, . step, E spawn enemy, Shift+X stress.
+
+- `npm test` (Vitest, 46 tests):
+  - `music.test.ts` — MML parsing, repeats, every song's tracks are the same length and a whole number of bars.
+  - `sim.test.ts` — the autopilot clears every stage headlessly; two runs with the same input give the same state hash.
+  - `bosses.test.ts` — every midboss and boss can actually be destroyed (regression for unreachable weak points).
+  - `replay.test.ts` — replay encoding round-trips exactly; a recorded mortal run (keyboard + touch input) replays to the same state.
+- `npm run e2e` (Playwright, against `dist/` and `dist-single/`): boot / title, start a game and score, pause / resume,
+  touch drag on an iPhone 12 profile, live run vs. its replay (frame, score, position, kills must match), best score →
+  stored replay → playback from the ranking, single-file build from `file://`.
+- `?debug=1` — debug overlay; keys: `` ` `` overlay, H hitboxes, I god, M max power, F1–F6 stage, N midboss, B boss / kill part,
+  PgDn next checkpoint, O pause, `.` step, E spawn enemy, Shift+X stress.
 
 ## Deviations from the spec (intentional)
-- Terrain is a per-pixel material bitmap in 256×256 chunks instead of 16×16 tiles with masks (same behaviour, simpler authoring; 02 §7.3).
-- Bitmap font glyphs are 5×7 in a 6×8 cell (07 §10 says 8×8).
-- Enemy broadphase is brute force (enemy counts are small) instead of a uniform grid (02 §7.2).
-- Debug code is bundled (enabled only with `?debug`) instead of a dynamic import, so the single-file build stays one file.
-- `|` in MML is a bar line everywhere; the repeat break is `/` (08 §4.1 updated).
 
-## Progress (resume from here)
-Done: engine, UI/scenes, stages 1–4 (+ midbosses/bosses, music), headless tests (`npm test`: sim, music, bosses).
-In progress: stage 5 FOUNDRY — `src/content/sprites/enemies5.ts` written; still to write:
-`content/enemies/st5.ts` (press, beltgun, welder, scrap, assembly wrapper, molten-falls controller),
-`content/bosses/st5.ts` (assemblyarm MB5, anvil B5), `content/backgrounds/foundry.ts`, `content/stages/stage5.ts`
-(vertical shaft via scrollV, conveyors via stage.onUpdate → w.conveyorPush, haze via w.haze), song `st5`.
-Then: stage 6 CHOIR CORE (beat sync 24f/beat, rhythm walls `dyn` kind 'rhythm', ECHO, SERAPH, CANTOR, ANTIPHON,
-THE CHOIR 3 forms incl. melody bullets from `final2` lead track), songs `st6`, `final1`, `final2`, heartbeat.
-Then: loop-2 check, PWA manifest/icon + `npm run build:single`, GitHub Pages workflow, Playwright e2e script,
-docs update (deviations), final QA screenshots, commit/push.
-Register new content in `src/content/index.ts`, `content/stages/index.ts`, `content/music/index.ts`, `content/backgrounds/index.ts`.
+- **Terrain** is a per-pixel material bitmap in 256×256 chunks instead of 16×16 tiles with masks (same behaviour,
+  simpler authoring; 02 §7.3). Materials: rock, crystal, breakable, conveyor L/R, alternate.
+- **Bitmap font** glyphs are 5×7 in a 6×8 cell (07 §10 says 8×8). Japanese text uses the overlay canvas (DotGothic16).
+- **Enemy broadphase** is brute force (enemy counts are small) instead of a uniform grid (02 §7.2).
+- **Debug code** is bundled (enabled only with `?debug`) instead of a dynamic import, so the single-file build stays one file.
+- **MML**: `|` is a bar line everywhere; the repeat break is `/`; `^` ties without repeating the pitch (also after chords and
+  rests); `{...}` chords; per-song `meter`. 08 §4.1 has been updated to match.
+- **Stage 2 branch** is laid out inside the screen height (upper and lower routes split by a crystal island) instead of a
+  taller world with a vertical camera (02 §6 SHOULD). Stage 5's vertical shaft does use vertical scrolling.
+- **Attract demo** is played by the autopilot (stage 1, god mode, 90 s) instead of a recorded developer replay (09 §3.3).
+  It never desyncs after balance changes, which a stored input log would.
+- **Replays** are kept in localStorage as `aetherlance.replay.<board>` (header + RLE-varint-base64 input log) rather than
+  listed in `SaveData.replays`; the ranking checks that the stored replay still matches the #1 entry. A replay records
+  each stage's shot mode and the in-scene decisions (tally skip, continue) as extra input bits, so it stays in sync even
+  if options change mid-run. Replays are tied to the game version string.
+- **Save data in the single-file build** works the same (localStorage), but the service worker is only registered for the
+  served PWA build.
+
+## Not implemented (COULD items)
+
+- SCORE ATTACK mode (03 §12).
+- Statistics screen and achievements (03 §13). Lifetime stats are counted in the save data, and a per-run flight record
+  is shown in the ending, but there is no separate stats / achievements screen.
+- Subsetting DotGothic16 into the single-file build (02 §8); the single file falls back to system fonts offline.
+- The SHOULD "survival bot" that searches for unavoidable bullet situations (10 §3) is covered only partially: the autopilot
+  clears all stages and defeats every boss, but there is no automated "no escape" detector.
