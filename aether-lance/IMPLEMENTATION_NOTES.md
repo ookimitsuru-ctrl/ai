@@ -20,3 +20,15 @@ Spec: `docs/` (README → 01..11). This file tracks how the code maps to it and 
 - Enemy broadphase is brute force (enemy counts are small) instead of a uniform grid (02 §7.2).
 - Debug code is bundled (enabled only with `?debug`) instead of a dynamic import, so the single-file build stays one file.
 - `|` in MML is a bar line everywhere; the repeat break is `/` (08 §4.1 updated).
+
+## Progress (resume from here)
+Done: engine, UI/scenes, stages 1–4 (+ midbosses/bosses, music), headless tests (`npm test`: sim, music, bosses).
+In progress: stage 5 FOUNDRY — `src/content/sprites/enemies5.ts` written; still to write:
+`content/enemies/st5.ts` (press, beltgun, welder, scrap, assembly wrapper, molten-falls controller),
+`content/bosses/st5.ts` (assemblyarm MB5, anvil B5), `content/backgrounds/foundry.ts`, `content/stages/stage5.ts`
+(vertical shaft via scrollV, conveyors via stage.onUpdate → w.conveyorPush, haze via w.haze), song `st5`.
+Then: stage 6 CHOIR CORE (beat sync 24f/beat, rhythm walls `dyn` kind 'rhythm', ECHO, SERAPH, CANTOR, ANTIPHON,
+THE CHOIR 3 forms incl. melody bullets from `final2` lead track), songs `st6`, `final1`, `final2`, heartbeat.
+Then: loop-2 check, PWA manifest/icon + `npm run build:single`, GitHub Pages workflow, Playwright e2e script,
+docs update (deviations), final QA screenshots, commit/push.
+Register new content in `src/content/index.ts`, `content/stages/index.ts`, `content/music/index.ts`, `content/backgrounds/index.ts`.
