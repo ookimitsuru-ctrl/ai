@@ -10,12 +10,13 @@ import { t } from '../i18n/index';
 import { panel } from '../ui/menu';
 import { backdrop } from './backdrop';
 import { TitleScene } from './title';
-import type { RunState } from '../app';
-import { fmtTime } from './game';
+import { storeReplay, replayInfo, loadReplay, type RunState } from '../app';
+import { GameScene, fmtTime } from './game';
 
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-!?★♥ ';
 
 export class NameEntryScene implements Scene {
+  readonly id = 'NameEntryScene';
   t = 0;
   name: string[];
   pos = 0;
@@ -72,6 +73,9 @@ export class NameEntryScene implements Scene {
     const d = new Date();
     const entry: RankEntry = { name, score: this.score, reach, date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, flags, weapon: r.loadout.weapon };
     const pos = insertRank(this.board, entry, this.time);
+    // keep the replay of the best run on each board
+    if (pos === 0) storeReplay(this.board, entry, r);
+    delete r.rec;
     persist();
     audio.sfx('menu_confirm');
     scenes.goto(() => new RankingScene(this.board, pos), 40);
@@ -101,22 +105,51 @@ export class NameEntryScene implements Scene {
 }
 
 export class RankingScene implements Scene {
+  readonly id = 'RankingScene';
   t = 0;
   tab: number;
+  /** replay of the #1 entry on the current board, if it is still the one on top */
+  hasReplay = false;
+  private replayTab = -1;
   constructor(board: Difficulty | 'bossrush' = 'normal', private highlight = -1) {
     this.tab = board === 'bossrush' ? 4 : DIFFS.indexOf(board);
   }
   boards: (Difficulty | 'bossrush')[] = [...DIFFS, 'bossrush'];
+  private checkReplay(): void {
+    if (this.replayTab === this.tab) return;
+    this.replayTab = this.tab;
+    const b = this.boards[this.tab]!;
+    const info = replayInfo(b);
+    const top = save.data.records[b][0];
+    this.hasReplay = !!info && !!top && info.name === top.name && info.score === top.score && info.date === top.date;
+  }
+  private back(): void {
+    audio.sfx('menu_cancel');
+    if (scenes.stack.length > 1) scenes.pop(); else scenes.goto(() => new TitleScene(), 30);
+  }
+  private playReplay(): void {
+    const board = this.boards[this.tab]!;
+    const d = loadReplay(board);
+    if (!d) { this.hasReplay = false; audio.sfx('menu_cancel'); return; }
+    audio.sfx('menu_confirm');
+    audio.stopMusic(0.6);
+    const label = `${d.name}  ${board === 'bossrush' ? fmtTime(d.score) : d.score}`;
+    scenes.goto(() => new GameScene(structuredClone(d.run), { frames: d.decoded, modes: d.modes, label, exit: () => new RankingScene(board) }), 40);
+  }
   update(): void {
     this.t++;
+    this.checkReplay();
     if (input.repeat('left')) { this.tab = (this.tab + 4) % 5; this.highlight = -1; audio.sfx('menu_move'); }
     if (input.repeat('right')) { this.tab = (this.tab + 1) % 5; this.highlight = -1; audio.sfx('menu_move'); }
     const p = input.pointer;
     if (p.clicked && p.y < 48) { const i = Math.floor((p.x - 40) / 80); if (i >= 0 && i < 5) { this.tab = i; this.highlight = -1; } p.clicked = false; }
-    if (input.menuConfirm() || input.menuCancel() || (p.clicked && p.y >= 48)) {
-      audio.sfx('menu_cancel');
-      if (scenes.stack.length > 1) scenes.pop(); else scenes.goto(() => new TitleScene(), 30);
+    if (p.clicked && p.y >= 48) {
+      // tap the top row (or the hint) to watch its replay, anywhere else to go back
+      if (this.hasReplay && ((p.y >= 72 && p.y < 88) || p.y >= 240)) this.playReplay(); else this.back();
+      return;
     }
+    if (input.menuConfirm()) { if (this.hasReplay) this.playReplay(); else this.back(); return; }
+    if (input.menuCancel()) this.back();
   }
   render(): void {
     backdrop.draw(renderer.game, 0.65);
@@ -145,11 +178,14 @@ export class RankingScene implements Scene {
       const wl = e.weapon === 'pulse' ? 'P' : e.weapon === 'fan' ? 'F' : 'R';
       f.draw(h, wl, 424, y, wl === 'P' ? 'C3' : wl === 'F' ? 'G3' : 'P3');
       if (e.flags.length) f.draw(h, e.flags.join(' '), 140, y, 'O5');
+      if (i === 0 && this.hasReplay) f.draw(h, '▶', 46, y, (this.t >> 4) % 2 ? 'C4' : 'C3');
     });
+    f.draw(h, this.hasReplay ? 'Z: WATCH REPLAY   X: BACK' : 'X: BACK', 240, 246, 'N4', 1, 'center');
   }
 }
 
 export class CreditsScene implements Scene {
+  readonly id = 'CreditsScene';
   t = 0;
   update(): void {
     this.t++;

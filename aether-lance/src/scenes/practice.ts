@@ -15,6 +15,7 @@ const STARTS: RunState['startAt'][] = ['start', 'cp1', 'midboss', 'cp2', 'cp3', 
 const DEFAULT_LOAD: Record<number, [number, number, number]> = { 1: [1, 0, 0], 2: [4, 2, 1], 3: [5, 3, 1], 4: [5, 4, 2], 5: [5, 4, 2], 6: [5, 4, 2] };
 
 export class PracticeScene implements Scene {
+  readonly id = 'PracticeScene';
   t = 0;
   menu: Menu;
   static st = { stage: 1, loop: 1, start: 0, weapon: 'pulse' as WeaponType, lv: 1, sub: null as SubType | null, subLv: 1, drones: 0, form: 'wing' as Formation, barrier: false, diff: 'normal' as Difficulty, god: false };

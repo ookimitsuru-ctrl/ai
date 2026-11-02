@@ -2,6 +2,7 @@
 import { input } from './input';
 
 export interface Scene {
+  readonly id?: string;
   /** Draw lower scenes too (pause overlay etc). */
   transparent?: boolean;
   enter?(): void;

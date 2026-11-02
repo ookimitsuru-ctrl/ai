@@ -19,6 +19,7 @@ import { GameScene, fmtTime } from './game';
 import type { RunState } from '../app';
 
 export class EndingScene implements Scene {
+  readonly id = 'EndingScene';
   t = 0;
   hold = 0;
   armed = false; // skip only after the button has been released once (no carry-over from gameplay)

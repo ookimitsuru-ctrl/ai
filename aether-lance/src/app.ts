@@ -5,6 +5,10 @@ import { renderer } from './render/renderer';
 import { audio } from './audio/engine';
 import type { StageDef } from './game/stage';
 import type { PlayerLoadout } from './game/entities';
+import { encodeFrames, decodeFrames, type Recorder, type StoredReplay } from './game/replay';
+import type { InputFrame } from './game/player';
+
+export const VERSION = 'v1.0.0';
 
 export const STAGES: StageDef[] = [];
 export function registerStage(s: StageDef): void { STAGES[s.id - 1] = s; }
@@ -55,6 +59,8 @@ export interface RunState {
   shots: number;
   assist: boolean;
   practiceSingle: boolean;
+  /** input recording for the replay of this run (not persisted with the run itself) */
+  rec?: Recorder<RunState>;
 }
 
 export function newRun(mode: RunState['mode'], diff: Difficulty, respawn: RunState['respawn']): RunState {
@@ -64,6 +70,53 @@ export function newRun(mode: RunState['mode'], diff: Difficulty, respawn: RunSta
     drive: 0, startAt: 'start', god: false, frames: 0, deaths: 0, kills: 0, shots: 0,
     assist: save.data.settings.gameSpeed < 100, practiceSingle: false,
   };
+}
+
+/** Copy of a run without its recorder (used as a replay's starting state). */
+export function runSnapshot(r: RunState): RunState {
+  const { rec: _rec, ...rest } = r;
+  void _rec;
+  return structuredClone(rest);
+}
+
+// ---- replays: best run per board (docs/09_ui.md §8) ----------------------------------------------------------
+const replayKey = (board: string): string => 'aetherlance.replay.' + board;
+export const REPLAY_BOARDS = ['easy', 'normal', 'hard', 'ordeal', 'bossrush'] as const;
+
+export function storeReplay(board: Difficulty | 'bossrush', entry: { name: string; score: number; date: string }, r: RunState): boolean {
+  const rec = r.rec;
+  if (!rec || rec.frames.length === 0) return false;
+  const data: StoredReplay<RunState> = {
+    version: 1, gameVersion: VERSION, board, name: entry.name, score: entry.score, date: entry.date,
+    modes: rec.modes, run: rec.start, frames: rec.frames.length, input: encodeFrames(rec.frames),
+  };
+  try { localStorage.setItem(replayKey(board), JSON.stringify(data)); return true; } catch { return false; }
+}
+
+export function loadReplay(board: Difficulty | 'bossrush'): (StoredReplay<RunState> & { decoded: InputFrame[] }) | null {
+  try {
+    const raw = localStorage.getItem(replayKey(board));
+    if (!raw) return null;
+    const d = JSON.parse(raw) as StoredReplay<RunState>;
+    if (d.version !== 1 || d.gameVersion !== VERSION || typeof d.input !== 'string' || !Array.isArray(d.modes)) return null;
+    const decoded = decodeFrames(d.input);
+    if (decoded.length !== d.frames) return null;
+    return { ...d, decoded };
+  } catch { return null; }
+}
+
+/** Replay header only (cheap check for the ranking screen). */
+export function replayInfo(board: Difficulty | 'bossrush'): { name: string; score: number; date: string } | null {
+  try {
+    const raw = localStorage.getItem(replayKey(board));
+    if (!raw) return null;
+    const d = JSON.parse(raw) as StoredReplay<RunState>;
+    return d.version === 1 && d.gameVersion === VERSION ? { name: d.name, score: d.score, date: d.date } : null;
+  } catch { return null; }
+}
+
+export function eraseReplays(): void {
+  for (const b of REPLAY_BOARDS) { try { localStorage.removeItem(replayKey(b)); } catch { /* */ } }
 }
 
 export function hiScore(diff: Difficulty): number {

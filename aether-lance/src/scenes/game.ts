@@ -11,7 +11,8 @@ import { WorldView } from '../render/worldRender';
 import { World, type WorldEvent } from '../game/world';
 import { IB, type InputFrame } from '../game/player';
 import { DIFFICULTY, SCORE, DRIVE } from '../data/balance';
-import { STAGES, hiScore, vibrate, type RunState } from '../app';
+import { STAGES, hiScore, vibrate, runSnapshot, type RunState } from '../app';
+import { MENU_OK, MENU_NO, quantise, recordFrame, type Playback } from '../game/replay';
 import { t, type StrKey } from '../i18n/index';
 import { panel } from '../ui/menu';
 import { PauseScene } from './pause';
@@ -24,6 +25,7 @@ import { Debug } from './debug';
 interface Tally { lines: { label: string; value: number }[]; total: number; shown: number; t: number }
 
 export class GameScene implements Scene {
+  readonly id: string = 'GameScene';
   touchMode = 'game' as const;
   world!: World;
   view!: WorldView;
@@ -41,23 +43,40 @@ export class GameScene implements Scene {
   lastTime = performance.now();
   frameTimes: number[] = [];
   debug: Debug | null = null;
-  recording: InputFrame[] = [];
-  replay: InputFrame[] | null = null;
+  /** replay playback (null when a person or the autopilot is playing) */
+  replay: Playback | null = null;
   replayIdx = 0;
+  /** stages started in this scene's playback (indexes Playback.modes) */
+  replayStage = 0;
+  /** where a replay returns to when it ends or is interrupted */
+  replayExit: (() => Scene) | null = null;
   bossRushDone = false;
 
   source: ((w: World) => InputFrame) | null = null;
   demoFrames = 0;
 
-  constructor(public run: RunState, replay?: InputFrame[], source?: (w: World) => InputFrame, demoFrames = 0) {
+  constructor(public run: RunState, replay?: Playback & { exit: () => Scene }, source?: (w: World) => InputFrame, demoFrames = 0) {
     this.replay = replay ?? null;
+    this.replayExit = replay?.exit ?? null;
     this.source = source ?? null;
     this.demoFrames = demoFrames;
+    // record every human arcade / boss rush run (the recorder rides on the run, so loop 2 keeps appending)
+    if (!this.spectating && run.mode !== 'practice') run.rec ??= { start: runSnapshot(run), modes: [], frames: [] };
     if (location.search.includes('debug')) this.debug = new Debug(this);
     this.startStage();
   }
 
   get stageDef() { return STAGES[this.run.stage - 1]!; }
+  /** replay or autopilot: no saving, no stats, no pause */
+  get spectating(): boolean { return !!this.replay || !!this.source; }
+
+  /** Shot mode for the stage being started (recorded per stage so replays stay in sync with option changes). */
+  private stageShotMode(): 'hold' | 'toggle' {
+    if (this.replay) return this.replay.modes[this.replayStage++] ?? 'hold';
+    const m = save.data.settings.shotMode;
+    this.run.rec?.modes.push(m);
+    return m;
+  }
 
   startStage(): void {
     const r = this.run;
@@ -66,7 +85,7 @@ export class GameScene implements Scene {
     this.world = new World({
       stage: def, diff: r.diff, loop: r.loop, mode: r.mode, respawn: r.respawn,
       score: r.score, lives: r.lives < 0 ? cfg.lives - 1 : r.lives, extIdx: r.extIdx, loadout: r.loadout, drive: r.drive,
-      startAt: r.startAt, god: r.god, shotMode: save.data.settings.shotMode,
+      startAt: r.startAt, god: r.god, shotMode: this.stageShotMode(),
     });
     this.world.continues = r.continues;
     this.world.renderHooks.wave = (x, y, rr, life, s) => renderer.addWave(x, y, rr, life, s);
@@ -76,7 +95,7 @@ export class GameScene implements Scene {
     this.stageT = r.startAt === 'start' || r.mode === 'bossrush' ? 0 : 200;
     this.tally = null;
     renderer.haze = 0;
-    if (r.mode === 'arcade') {
+    if (r.mode === 'arcade' && !this.spectating) {
       const P = save.data.progress;
       P.reachedStage[r.diff] = Math.max(P.reachedStage[r.diff], r.stage);
       if (r.loop >= 2) P.loop2Reached = true;
@@ -91,7 +110,7 @@ export class GameScene implements Scene {
   private buildInput(): InputFrame {
     if (this.source) return this.source(this.world);
     if (this.replay) {
-      const f = this.replay[this.replayIdx++] ?? { bits: 0, tdx: 0, tdy: 0, ax: 0, ay: 0 };
+      const f = this.replay.frames[this.replayIdx++] ?? { bits: 0, tdx: 0, tdy: 0, ax: 0, ay: 0 };
       return f;
     }
     const h = input.held, p = input.pressed;
@@ -110,7 +129,10 @@ export class GameScene implements Scene {
     let tdx = 0, tdy = 0, ax = 0, ay = 0;
     if (input.touchActive && input.lastDevice === 'touch') { bits |= IB.TOUCH; tdx = input.touchDx; tdy = input.touchDy; }
     if (input.analogMove && (input.analogX || input.analogY) && input.lastDevice === 'pad') { bits |= IB.ANALOG; ax = input.analogX; ay = input.analogY; }
-    return { bits, tdx, tdy, ax, ay };
+    // decisions made inside this scene (tally skip, continue) travel with the input so replays reproduce them
+    if (input.menuConfirm() || input.pointer.clicked) bits |= MENU_OK;
+    if (input.menuCancel()) bits |= MENU_NO;
+    return quantise({ bits, tdx, tdy, ax, ay });
   }
 
   update(): void {
@@ -118,19 +140,19 @@ export class GameScene implements Scene {
     this.stageT++;
     const w = this.world;
     if (this.debug) this.debug.update();
-    if (!this.replay && !this.demoFrames && (input.hit('pause') || document.hidden) && !this.tally && !this.cont && !scenes.busy) {
+    if (!this.spectating && (input.hit('pause') || document.hidden) && !this.tally && !this.cont && !scenes.busy) {
       audio.sfx('pause');
       scenes.push(new PauseScene(this));
       return;
     }
-    const demo = !!this.replay || this.demoFrames > 0;
-    if (demo && ((input.anyPressed || input.pointer.clicked) && this.t > 10 || (this.demoFrames > 0 && this.t > this.demoFrames))) { if (!scenes.busy) { audio.stopMusic(0.5); scenes.goto(() => new TitleScene(), 30); } return; }
+    if (this.spectating && ((input.anyPressed || input.pointer.clicked) && this.t > 10 || (this.demoFrames > 0 && this.t > this.demoFrames))) { this.endSpectate(); return; }
     if (this.ready > 0) { this.ready--; return; }
-    if (this.cont) { this.updateContinue(); this.flush(); return; }
     if (this.debug?.paused && !this.debug.step) { this.flush(); return; }
+    if (this.replay && this.replayIdx >= this.replay.frames.length) { this.endSpectate(); return; }
     const inp = this.buildInput();
-    if (!this.replay) this.recording.push(inp);
-    if (this.tally) { this.updateTally(); w.update({ bits: inp.bits & ~(IB.DRIVE | IB.SHOT), tdx: inp.tdx, tdy: inp.tdy, ax: inp.ax, ay: inp.ay }); }
+    if (this.run.rec) recordFrame(this.run.rec, inp);
+    if (this.cont) { this.updateContinue(inp); this.flush(); return; }
+    if (this.tally) { this.updateTally(inp); w.update({ bits: inp.bits & ~(IB.DRIVE | IB.SHOT), tdx: inp.tdx, tdy: inp.tdy, ax: inp.ax, ay: inp.ay }); }
     else w.update(inp);
     if (this.debug?.step) this.debug.step = false;
     this.run.frames++;
@@ -145,6 +167,15 @@ export class GameScene implements Scene {
     this.autoQuality();
   }
 
+  /** Leave a replay / attract demo. */
+  private endSpectate(): void {
+    if (scenes.busy || this.over) return;
+    this.over = true;
+    audio.stopMusic(0.5);
+    const exit = this.replayExit;
+    scenes.goto(() => (exit ? exit() : new TitleScene()), 30);
+  }
+
   private flush(): void {
     const w = this.world;
     for (const s of w.sfxQ) {
@@ -155,7 +186,7 @@ export class GameScene implements Scene {
     w.sfxQ.length = 0;
     for (const m of w.musicQ) {
       switch (m.cmd) {
-        case 'play': audio.playMusic(m.id, m.fade ?? 0); if (!save.data.progress.heardSongs.includes(m.id)) save.data.progress.heardSongs.push(m.id); break;
+        case 'play': audio.playMusic(m.id, m.fade ?? 0); if (!this.spectating && !save.data.progress.heardSongs.includes(m.id)) save.data.progress.heardSongs.push(m.id); break;
         case 'stop': audio.stopMusic(m.fade ?? 0.05); break;
         case 'drive': audio.setDrive(m.on); break;
         case 'duck': audio.duck(m.db, m.sec); break;
@@ -176,7 +207,7 @@ export class GameScene implements Scene {
       case 'warning': this.warnT = 180; this.warnName = ev.name; break;
       case 'checkpoint': this.cpT = 60; break;
       case 'vibrate': vibrate(ev.ms); break;
-      case 'death': this.run.deaths++; save.data.stats.deaths++; break;
+      case 'death': this.run.deaths++; if (!this.spectating) save.data.stats.deaths++; break;
       case 'stageClear': this.beginTally(ev.bossBonus); break;
       case 'gameOver': this.onGameOver(); break;
       default: break;
@@ -203,10 +234,10 @@ export class GameScene implements Scene {
     audio.playMusic('jingle_clear');
   }
 
-  private updateTally(): void {
+  private updateTally(inp: InputFrame): void {
     const T = this.tally!;
     T.t++;
-    const skip = input.menuConfirm() && T.t > 30;
+    const skip = (inp.bits & MENU_OK) !== 0 && T.t > 30;
     if (skip) T.t = Math.max(T.t, 40 + T.lines.length * 30);
     if (T.t > 40 + T.lines.length * 30 && T.shown < T.total) {
       const step = Math.max(1, Math.ceil(T.total / 60));
@@ -225,6 +256,7 @@ export class GameScene implements Scene {
     r.score = w.score; r.lives = w.lives; r.extIdx = w.extIdx; r.continues = w.continues;
     r.loadout = w.player.loadout(); r.drive = w.player.driving ? 0 : w.player.drive;
     r.kills += w.stats.kills; r.shots += w.stats.shots;
+    if (this.spectating) return;
     save.data.stats.kills += w.stats.kills;
     save.data.stats.weaponUse[w.player.weapon]++;
   }
@@ -232,13 +264,22 @@ export class GameScene implements Scene {
   private nextStage(): void {
     this.carry();
     const r = this.run;
-    if (r.mode === 'practice') { persist(); scenes.goto(() => new PracticeScene(), 30); return; }
+    if (r.mode === 'practice' && !this.spectating) { persist(); scenes.goto(() => new PracticeScene(), 30); return; }
     const last = r.stage >= 6 || !STAGES[r.stage];
     if (!last) {
       r.stage++;
       if (r.mode !== 'bossrush') r.startAt = 'start';
-      persist();
+      if (!this.spectating) persist();
       scenes.transition(() => this.startStage(), 30);
+      return;
+    }
+    if (this.spectating) {
+      // a recorded run that went on into loop 2: skip the ending and carry on (same hand-off as EndingScene)
+      if (this.replay && r.mode === 'arcade' && r.loop < 2 && this.replayIdx < this.replay.frames.length) {
+        r.loop = 2; r.stage = 1; r.startAt = 'start';
+        audio.stopMusic(1);
+        scenes.transition(() => this.startStage(), 60);
+      } else this.endSpectate();
       return;
     }
     // loop / ending
@@ -261,33 +302,34 @@ export class GameScene implements Scene {
   private onGameOver(): void {
     const r = this.run;
     const cfg = DIFFICULTY[r.diff];
-    if (r.mode === 'practice') { audio.stopMusic(0.5); scenes.goto(() => new PracticeScene(), 40); return; }
+    if (r.mode === 'practice' && !this.spectating) { audio.stopMusic(0.5); scenes.goto(() => new PracticeScene(), 40); return; }
     audio.stopMusic(0.3);
     audio.playMusic('jingle_gameover');
     if (r.mode === 'arcade' && this.world.continues < cfg.continues) this.cont = { t: 0 };
     else this.finish();
   }
 
-  private updateContinue(): void {
+  private updateContinue(inp: InputFrame): void {
     const c = this.cont!;
     c.t++;
     const left = 10 - Math.floor(c.t / 60);
     if (c.t % 60 === 0 && left >= 0) audio.sfx('countdown');
-    if (c.t > 30 && (input.menuConfirm() || input.pointer.clicked)) {
+    if (c.t > 30 && (inp.bits & MENU_OK)) {
       this.cont = null;
       audio.sfx('menu_confirm');
       this.run.continues++;
-      save.data.stats.credits++;
+      if (!this.spectating) save.data.stats.credits++;
       this.world.continueGame();
       const bossSong = this.world.phase === 'boss' && this.world.bossReady;
       audio.playMusic(bossSong ? this.world.stage.bossBgm : this.world.musicId || this.world.stage.bgm);
       return;
     }
-    if (c.t > 30 && input.menuCancel()) c.t = Math.min(c.t + 60, 660);
+    if (c.t > 30 && (inp.bits & MENU_NO)) c.t = Math.min(c.t + 60, 660);
     if (left < 0) { this.cont = null; this.finish(); }
   }
 
   private finish(): void {
+    if (this.spectating) { this.carry(); this.endSpectate(); return; }
     if (this.over) return;
     this.over = true;
     this.carry();
@@ -326,14 +368,18 @@ export class GameScene implements Scene {
     const label = `${w.loop >= 2 ? '2-' : ''}${w.stage.id}-${w.section}`;
     drawHud(h, w, Math.max(hiScore(this.run.diff), 0), this.run.mode === 'practice' ? 'PRACTICE' : this.run.mode === 'bossrush' ? 'BOSS RUSH ' + fmtTime(this.run.frames) : label);
     const f = font();
-    // stage intro card
-    if (this.stageT < 240 && !this.tally) this.drawIntro(h);
-    if (this.warnT > 0) this.drawWarning(h);
+    // stage intro card (hidden under the pause overlay so it does not fight with the menu)
+    const covered = scenes.top !== this;
+    if (this.stageT < 240 && !this.tally && !covered) this.drawIntro(h);
+    if (this.warnT > 0 && !covered) this.drawWarning(h);
     if (this.cpT > 0) f.draw(h, t('checkpoint'), 470, 18, (this.cpT >> 3) % 2 ? 'C4' : 'N8', 1, 'right', 'N0');
     if (this.tally) this.drawTally(h);
     if (this.cont) this.drawContinue(h);
     if (this.ready > 0) f.draw(h, 'READY', 240, 128, (this.ready >> 2) % 2 ? 'N8' : 'C4', 2, 'center', 'N0');
-    if (this.replay || this.demoFrames) { if ((this.t >> 5) % 2) f.draw(h, 'DEMO PLAY', 240, 220, 'N8', 2, 'center', 'N0'); f.draw(h, 'PRESS START', 240, 240, 'C4', 1, 'center', 'N0'); }
+    if (this.replay) {
+      if ((this.t >> 5) % 2) f.draw(h, 'REPLAY', 240, 226, 'N8', 2, 'center', 'N0');
+      f.draw(h, this.replay.label, 240, 246, 'C4', 1, 'center', 'N0');
+    } else if (this.demoFrames) { if ((this.t >> 5) % 2) f.draw(h, 'DEMO PLAY', 240, 220, 'N8', 2, 'center', 'N0'); f.draw(h, 'PRESS START', 240, 240, 'C4', 1, 'center', 'N0'); }
     if (this.world.player.state === 'gone' && !this.cont && !this.tally) f.draw(h, 'GAME OVER', 240, 128, 'N8', 3, 'center', 'N0');
     if (st.showFps || this.debug) this.drawFps(h);
     this.debug?.render(h);

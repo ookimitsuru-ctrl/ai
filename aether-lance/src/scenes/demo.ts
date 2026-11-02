@@ -4,6 +4,7 @@ import { newRun } from '../app';
 import { botInput } from '../game/bot';
 
 export class DemoScene extends GameScene {
+  override readonly id = 'DemoScene';
   constructor() {
     const run = newRun('practice', 'normal', 'inplace');
     run.god = true;

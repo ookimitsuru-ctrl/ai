@@ -9,7 +9,7 @@ import { audio } from '../audio/engine';
 import { t, type StrKey } from '../i18n/index';
 import { Menu, Confirm, panel, type MenuItem } from '../ui/menu';
 import { backdrop } from './backdrop';
-import { saveSettings } from '../app';
+import { saveSettings, eraseReplays } from '../app';
 
 type Tab = 'game' | 'controls' | 'video' | 'audio' | 'access' | 'data';
 
@@ -17,6 +17,7 @@ function cycle<T>(arr: readonly T[], v: T, d: number): T { const i = arr.indexOf
 const onoff = (b: boolean) => (b ? 'ON' : 'OFF');
 
 export class OptionsScene implements Scene {
+  readonly id = 'OptionsScene';
   t = 0;
   tabs: Tab[];
   tab = 0;
@@ -80,7 +81,7 @@ export class OptionsScene implements Scene {
       ],
       data: [
         { label: L('opt.resetSettings'), action: () => this.confirm.open(t('confirm.reset'), set(() => { const lang = S().lang; save.data.settings = defaultSettings(); save.data.settings.lang = lang; })) },
-        { label: L('opt.erase'), action: () => this.confirm.open(t('confirm.erase'), () => setTimeout(() => this.confirm.open(t('confirm.erase2'), () => { const st = save.data.settings; save.data = defaultSave(); save.data.settings = st; persist(); }), 0)) },
+        { label: L('opt.erase'), action: () => this.confirm.open(t('confirm.erase'), () => setTimeout(() => this.confirm.open(t('confirm.erase2'), () => { const st = save.data.settings; save.data = defaultSave(); save.data.settings = st; eraseReplays(); persist(); }), 0)) },
         { label: L('opt.export'), action: () => { try { void navigator.clipboard.writeText(btoa(unescape(encodeURIComponent(JSON.stringify(save.data))))); audio.sfx('pickup_chip'); } catch { /* */ } } },
         { label: L('opt.import'), action: () => { try { const s = window.prompt('SAVE DATA'); if (s) { const parsed = JSON.parse(decodeURIComponent(escape(atob(s.trim())))); localStorage.setItem('aetherlance.save.v1', JSON.stringify(parsed)); location.reload(); } } catch { /* */ } } },
       ],
@@ -114,7 +115,7 @@ export class OptionsScene implements Scene {
     this.tabs.forEach((tb, i) => {
       const on = i === this.tab;
       panel(h, 40 + i * tw + 1, 30, tw - 2, 16, on ? 0.9 : 0.4);
-      renderer.text(t(('opt.tab.' + tb) as StrKey), 40 + i * tw + tw / 2, 34, { size: 8, align: 'center', color: on ? 'N8' : 'N5' });
+      renderer.text(t(('opt.tab.' + tb) as StrKey), 40 + i * tw + tw / 2, 34, { size: 8, align: 'center', color: on ? 'N8' : 'N5', maxW: tw - 8 });
     });
     panel(h, 50, 56, 380, 176, 0.75);
     // labels via overlay (japanese), values via bitmap font
@@ -133,11 +134,12 @@ export class OptionsScene implements Scene {
   }
 }
 
-const ACT_LABEL: Record<Action, StrKey | string> = {
-  up: '↑', down: '↓', left: '←', right: '→', shot: 'controls.shot', drive: 'controls.drive', speedUp: 'SPEED +', speedDown: 'SPEED −', formation: 'controls.form', pause: 'controls.pause', confirm: 'OK', cancel: 'CANCEL',
+const ACT_LABEL: Record<Action, StrKey> = {
+  up: 'act.up', down: 'act.down', left: 'act.left', right: 'act.right', shot: 'controls.shot', drive: 'controls.drive', speedUp: 'act.speedUp', speedDown: 'act.speedDown', formation: 'controls.form', pause: 'controls.pause', confirm: 'act.confirm', cancel: 'act.cancel',
 };
 
 export class KeyConfigScene implements Scene {
+  readonly id = 'KeyConfigScene';
   t = 0;
   sel = 0;
   col = 0;
@@ -191,9 +193,7 @@ export class KeyConfigScene implements Scene {
     ACTIONS.forEach((a, i) => {
       const y = 48 + i * 14;
       const on = i === this.sel;
-      const lab = ACT_LABEL[a];
-      if (lab.includes('.')) renderer.text(t(lab as StrKey), 110, y - 1, { size: 8, color: on ? 'N8' : 'N5' });
-      else f.draw(h, lab, 110, y, on ? 'N8' : 'N5');
+      renderer.text(t(ACT_LABEL[a]), 110, y - 1, { size: 8, color: on ? 'N8' : 'N5', maxW: 150 });
       if (!this.pad) {
         for (let k = 0; k < 2; k++) {
           const sel = on && this.col === k;

@@ -55,7 +55,7 @@ function boot(): void {
       buildAllSprites();
     } catch (e) { showError(e); return; }
     scenes.replaceNow(new BootScene());
-    if (location.search.includes('debug')) (window as unknown as { __scenes: typeof scenes }).__scenes = scenes;
+    if (location.search.includes('debug')) Object.assign(window as object, { __scenes: scenes, __renderer: renderer });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) audio.suspend(); else audio.resume();
     });
@@ -101,6 +101,11 @@ function loop(now: number): void {
     showError(e);
   }
   requestAnimationFrame(loop);
+}
+
+// offline support (PWA) — only for the hosted build, not for the single-file build or dev server
+if (import.meta.env.PROD && location.protocol.startsWith('http') && !document.querySelector('meta[name="singlefile"]') && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => { /* optional */ }); });
 }
 
 window.addEventListener('error', (e) => showError(e.error ?? e.message));

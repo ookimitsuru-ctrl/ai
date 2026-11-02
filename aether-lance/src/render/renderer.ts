@@ -285,6 +285,17 @@ export class Renderer {
     this.hud.clearRect(0, 0, GW, GH);
   }
 
+  /** Fade the overlay text drawn so far (used when a modal scene dims the scene below it). */
+  fadeText(amount: number): void {
+    const o = this.overlay;
+    o.save();
+    o.setTransform(1, 0, 0, 1, 0, 0);
+    o.globalCompositeOperation = 'destination-out';
+    o.fillStyle = `rgba(0,0,0,${amount})`;
+    o.fillRect(0, 0, this.devW, this.devH);
+    o.restore();
+  }
+
   present(): void {
     this.time += 1 / 60;
     const gl = this.gl;

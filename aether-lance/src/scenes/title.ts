@@ -9,16 +9,17 @@ import { audio } from '../audio/engine';
 import { t } from '../i18n/index';
 import { backdrop } from './backdrop';
 import { Menu, panel } from '../ui/menu';
-import { hiScore, newRun } from '../app';
+import { hiScore, newRun, VERSION } from '../app';
 import { GameScene } from './game';
 import { OptionsScene } from './options';
 import { RankingScene, CreditsScene } from './records';
 import { PracticeScene } from './practice';
 import { DemoScene } from './demo';
 
-export const VERSION = 'v1.0.0';
+export { VERSION };
 
 export class BootScene implements Scene {
+  readonly id = 'BootScene';
   t = 0;
   update(): void {
     this.t++;
@@ -39,6 +40,7 @@ export class BootScene implements Scene {
 }
 
 export class TitleScene implements Scene {
+  readonly id = 'TitleScene';
   t = 0;
   idle = 0;
   enter(): void {
@@ -71,6 +73,7 @@ export class TitleScene implements Scene {
 }
 
 export class MainMenuScene implements Scene {
+  readonly id = 'MainMenuScene';
   t = 0;
   menu: Menu;
   constructor() {
@@ -82,7 +85,7 @@ export class MainMenuScene implements Scene {
       { label: 'RANKING', desc: () => t('menu.ranking'), action: () => scenes.push(new RankingScene()) },
       { label: 'OPTIONS', desc: () => t('menu.options'), action: () => scenes.push(new OptionsScene()) },
       { label: 'CREDITS', desc: () => t('menu.credits'), action: () => scenes.push(new CreditsScene()) },
-    ], 240, 140, 14);
+    ], 240, 139, 14);
   }
   update(): void {
     this.t++;
@@ -94,13 +97,14 @@ export class MainMenuScene implements Scene {
     const h = renderer.hud;
     backdrop.drawLogo(h, 40, this.t);
     renderer.text(t('title.sub'), 240, 76, { size: 9, align: 'center', color: 'C4' });
-    panel(h, 150, 128, 180, 92, 0.6);
+    panel(h, 150, 128, 180, 96, 0.6);
     this.menu.draw(h, this.t);
-    this.menu.drawDesc(232);
+    this.menu.drawDesc(236);
   }
 }
 
 export class DifficultyScene implements Scene {
+  readonly id = 'DifficultyScene';
   t = 0;
   sel = 1;
   respawn: 'inplace' | 'checkpoint' = 'inplace';

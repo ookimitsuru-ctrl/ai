@@ -13,6 +13,7 @@ import type { GameScene } from './game';
 import { ControlsPanel } from './options';
 
 export class PauseScene implements Scene {
+  readonly id = 'PauseScene';
   transparent = true;
   t = 0;
   menu: Menu;
@@ -48,7 +49,8 @@ export class PauseScene implements Scene {
   }
   render(): void {
     const h = renderer.hud;
-    h.fillStyle = rgba('N0', 0.6); h.fillRect(0, 0, 480, 270);
+    h.fillStyle = rgba('N0', 0.72); h.fillRect(0, 0, 480, 270);
+    renderer.fadeText(1);
     const f = font();
     if (this.showControls) { new ControlsPanel().draw(h); return; }
     f.draw(h, 'PAUSE', 240, 40, 'N8', 3, 'center', 'N1');
