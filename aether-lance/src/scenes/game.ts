@@ -1,5 +1,6 @@
 // In-game scene: runs a World per stage, overlays (intro card, WARNING, clear tally, continue), progression.
 import { scenes, type Scene } from '../core/scene';
+import { pv } from '../core/pv';
 import { input, ACT } from '../core/input';
 import { save, persist, rankPosition } from '../core/save';
 import { renderer } from '../render/renderer';
@@ -185,6 +186,7 @@ export class GameScene implements Scene {
     }
     w.sfxQ.length = 0;
     for (const m of w.musicQ) {
+      if (pv.lockMusic) break; // PV capture: one track runs across the cuts
       switch (m.cmd) {
         case 'play': audio.playMusic(m.id, m.fade ?? 0); if (!this.spectating && !save.data.progress.heardSongs.includes(m.id)) save.data.progress.heardSongs.push(m.id); break;
         case 'stop': audio.stopMusic(m.fade ?? 0.05); break;
@@ -195,7 +197,7 @@ export class GameScene implements Scene {
     }
     w.musicQ.length = 0;
     // keep the music locked to the game clock on beat-synced stages
-    if (w.stage.beatBpm && audio.music && audio.currentSong() === w.musicId && this.t % 15 === 0) {
+    if (w.stage.beatBpm && audio.music && audio.currentSong() === w.musicId && this.t % 15 === 0 && !pv.lockMusic) {
       const expected = ((w.frame - w.musicStartFrame) * w.stage.beatBpm * 48) / 3600;
       audio.music.syncTo(expected);
     }
@@ -366,14 +368,14 @@ export class GameScene implements Scene {
     const h = renderer.hud;
     const w = this.world;
     const label = `${w.loop >= 2 ? '2-' : ''}${w.stage.id}-${w.section}`;
-    drawHud(h, w, Math.max(hiScore(this.run.diff), 0), this.run.mode === 'practice' ? 'PRACTICE' : this.run.mode === 'bossrush' ? 'BOSS RUSH ' + fmtTime(this.run.frames) : label);
+    if (!pv.textless) drawHud(h, w, Math.max(hiScore(this.run.diff), 0), this.run.mode === 'practice' ? 'PRACTICE' : this.run.mode === 'bossrush' ? 'BOSS RUSH ' + fmtTime(this.run.frames) : label);
     const f = font();
     // stage intro card (hidden under the pause overlay so it does not fight with the menu)
-    const covered = scenes.top !== this;
+    const covered = scenes.top !== this || pv.textless;
     if (this.stageT < 240 && !this.tally && !covered) this.drawIntro(h);
     if (this.warnT > 0 && !covered) this.drawWarning(h);
     if (this.cpT > 0) f.draw(h, t('checkpoint'), 470, 18, (this.cpT >> 3) % 2 ? 'C4' : 'N8', 1, 'right', 'N0');
-    if (this.tally) this.drawTally(h);
+    if (this.tally && !pv.textless) this.drawTally(h);
     if (this.cont) this.drawContinue(h);
     if (this.ready > 0) f.draw(h, 'READY', 240, 128, (this.ready >> 2) % 2 ? 'N8' : 'C4', 2, 'center', 'N0');
     if (this.replay) {

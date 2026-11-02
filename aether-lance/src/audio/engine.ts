@@ -1,5 +1,6 @@
 // Audio engine: context, buses, reverb/delay, SFX playback with priorities, music control.
 import { renderAllSfx, SFX } from './sfxsynth';
+import { pv } from '../core/pv';
 import { MusicPlayer, type SongDef } from './sequencer';
 
 interface Voice { id: string; prio: number; src: AudioBufferSourceNode; end: number }
@@ -34,11 +35,16 @@ export class AudioEngine {
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AC) return;
     const ctx = new AC({ latencyHint: 'interactive' });
-    this.ctx = ctx;
     // iOS: play a silent buffer inside the gesture
     const sb = ctx.createBuffer(1, 1, ctx.sampleRate);
     const s = ctx.createBufferSource(); s.buffer = sb; s.connect(ctx.destination); s.start(0);
     void ctx.resume();
+    this.useContext(ctx);
+  }
+
+  /** Build the mixer on a context (the PV capture passes an offline context whose clock it drives). */
+  useContext(ctx: AudioContext): void {
+    this.ctx = ctx;
 
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.15;
@@ -100,7 +106,8 @@ export class AudioEngine {
 
   sfx(id: string, x = 240, volMul = 1, rate = 1): void {
     const ctx = this.ctx;
-    if (!ctx || !this.ready) return;
+    if (!ctx || !this.ready || pv.muteSfx) return;
+    volMul *= pv.sfxVol;
     const def = SFX[id];
     const buf = this.buffers.get(id);
     if (!def || !buf) return;
@@ -131,7 +138,8 @@ export class AudioEngine {
   }
 
   loopStart(key: string, id: string, vol = 1): void {
-    if (!this.ctx || this.loops.has(key)) return;
+    if (!this.ctx || this.loops.has(key) || pv.muteSfx) return;
+    vol *= pv.sfxVol;
     const buf = this.buffers.get(id);
     if (!buf) return;
     const src = this.ctx.createBufferSource();

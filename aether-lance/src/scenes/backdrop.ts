@@ -6,6 +6,7 @@ import { drawGlow } from '../render/draw';
 import { StarField } from '../content/backgrounds/common';
 import { planetCanvas } from '../content/backgrounds/orbit';
 import { SPR } from '../content/sprites/registry';
+import { pv } from '../core/pv';
 
 let logo: Canvas | null = null;
 
@@ -74,6 +75,7 @@ export class Backdrop {
   }
 
   drawLogo(g: CanvasRenderingContext2D, y: number, frame: number): void {
+    if (pv.textless) return;
     const lc = logoCanvas();
     const x = Math.round(240 - lc.width / 2);
     g.drawImage(lc, x, y);

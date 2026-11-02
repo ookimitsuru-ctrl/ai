@@ -9,6 +9,12 @@ import { buildAllSprites } from './content/index';
 import { ALL_SONGS } from './content/music/index';
 import { ALL_STAGES } from './content/stages/index';
 import { BootScene, TitleScene } from './scenes/title';
+import { GameScene } from './scenes/game';
+import { botInput } from './game/bot';
+import { IB } from './game/player';
+import { newRun } from './app';
+import { pv } from './core/pv';
+import { backdrop } from './scenes/backdrop';
 import { font } from './render/font';
 import { PAL } from './render/palette';
 import dotGothicUrl from './assets/fonts/DotGothic16-subset.woff2?url';
@@ -89,7 +95,19 @@ function boot(): void {
       buildAllSprites();
     } catch (e) { showError(e); return; }
     scenes.replaceNow(new BootScene());
-    if (location.search.includes('debug')) Object.assign(window as object, { __scenes: scenes, __renderer: renderer });
+    if (location.search.includes('debug')) {
+      Object.assign(window as object, {
+        __scenes: scenes, __renderer: renderer,
+        // hooks for scripts/make-pv.mjs (frame-exact capture) and other tooling
+        __dev: {
+          scenes, renderer, audio, save, pv, backdrop, GameScene, TitleScene, botInput, newRun, IB,
+          /** stop the real-time loop; the caller advances frames with advance() */
+          manual(on: boolean) { manual = on; },
+          /** run n fixed 60 Hz updates, then draw one frame */
+          advance(n = 1) { for (let i = 0; i < n; i++) stepOnce(); renderOnce(1); },
+        },
+      });
+    }
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) audio.suspend(); else audio.resume();
     });
@@ -100,8 +118,32 @@ function boot(): void {
 let acc = 0;
 let last = performance.now();
 let gameFrame = 0;
+let manual = false;
+
+function stepOnce(): void {
+  input.poll();
+  scenes.update();
+  gameFrame++;
+  audio.update(gameFrame);
+}
+
+function renderOnce(alpha: number): void {
+  renderer.beginFrame();
+  scenes.render(alpha);
+  if (scenes.fadeAlpha > 0) {
+    renderer.hud.fillStyle = `rgba(0,0,0,${scenes.fadeAlpha})`;
+    renderer.hud.fillRect(0, 0, 480, 270);
+    renderer.overlay.setTransform(1, 0, 0, 1, 0, 0);
+    renderer.overlay.globalAlpha = scenes.fadeAlpha;
+    renderer.overlay.fillStyle = '#000';
+    renderer.overlay.fillRect(renderer.vp.x, renderer.vp.y, renderer.vp.w, renderer.vp.h);
+    renderer.overlay.globalAlpha = 1;
+  }
+  renderer.present();
+}
 
 function loop(now: number): void {
+  if (manual) { last = now; acc = 0; requestAnimationFrame(loop); return; }
   const speed = save.data.settings.gameSpeed / 100;
   const STEP = 1000 / 60 / speed;
   let dt = now - last;
@@ -111,26 +153,12 @@ function loop(now: number): void {
   let steps = 0;
   try {
     while (acc >= STEP && steps < 5) {
-      input.poll();
-      scenes.update();
-      gameFrame++;
-      audio.update(gameFrame);
+      stepOnce();
       acc -= STEP;
       steps++;
     }
     if (steps === 5) acc = 0;
-    renderer.beginFrame();
-    scenes.render(acc / STEP);
-    if (scenes.fadeAlpha > 0) {
-      renderer.hud.fillStyle = `rgba(0,0,0,${scenes.fadeAlpha})`;
-      renderer.hud.fillRect(0, 0, 480, 270);
-      renderer.overlay.setTransform(1, 0, 0, 1, 0, 0);
-      renderer.overlay.globalAlpha = scenes.fadeAlpha;
-      renderer.overlay.fillStyle = '#000';
-      renderer.overlay.fillRect(renderer.vp.x, renderer.vp.y, renderer.vp.w, renderer.vp.h);
-      renderer.overlay.globalAlpha = 1;
-    }
-    renderer.present();
+    renderOnce(acc / STEP);
   } catch (e) {
     showError(e);
   }

@@ -178,6 +178,7 @@ Node.js 22 以上を推奨します（Vite 8 の要件）。実行時の依存�
 | `npm run lint` | 型チェックのみ |
 | `npm run e2e` | Playwright による E2E テスト（先に `build` と `build:single` が必要） |
 | `./android/build-apk.sh` | Android 用 APK を `dist-apk/AetherLance.apk` にビルド（JDK 17 以上、Gradle 8.7 以上、Android SDK の platform 34 が必要。`ANDROID_HOME` を設定しておく） |
+| `node scripts/make-pv.mjs` | 40秒のプロモーション映像（文字なし・ゲーム内の BGM と効果音つき、1080p 60fps）を `pv/aether-lance-pv.mp4` に書き出す（先に `build:single` が必要。ffmpeg を使う。`--preview` で低解像度の試し書き） |
 | `node scripts/subset-font.mjs` | 画面に出す文字を増やしたときに、埋め込みフォント（DotGothic16 のサブセット）を作り直す |
 
 **デバッグモード:** URL に `?debug=1` を付けて開くと、デバッグ表示とデバッグキーが使えます。

@@ -1,6 +1,7 @@
 // Original bitmap fonts: 5×7 glyphs in a 6×8 cell (uppercase), and 3×5 digits for score popups.
 import { makeCanvas, ctx2d, tinted, type Canvas } from './sprite';
 import { PAL, type PalKey } from './palette';
+import { pv } from '../core/pv';
 
 const G5: Record<string, string> = {
   A: '.###.|#...#|#...#|#####|#...#|#...#|#...#',
@@ -122,6 +123,7 @@ export class BitmapFont {
   }
 
   draw(g: CanvasRenderingContext2D, text: string, x: number, y: number, color: PalKey | string = 'N8', scale = 1, align: 'left' | 'center' | 'right' = 'left', shadow?: PalKey | string): void {
+    if (pv.textless) return;
     if (shadow) this.draw(g, text, x + scale, y + scale, shadow, scale, align);
     const hex = color.startsWith('#') || color.startsWith('rgb') ? color : PAL[color as PalKey];
     const sheet = this.sheet(hex);

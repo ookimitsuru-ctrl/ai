@@ -3,6 +3,7 @@
 import { makeCanvas, ctx2d, type Canvas } from './sprite';
 import { PAL, type PalKey } from './palette';
 import { input } from '../core/input';
+import { pv } from '../core/pv';
 
 export const GW = 480;
 export const GH = 270;
@@ -381,6 +382,7 @@ export class Renderer {
   }
 
   text(str: string, x: number, y: number, o: { size?: number; color?: PalKey | string; align?: CanvasTextAlign; alpha?: number; shadow?: boolean; maxW?: number; baseline?: CanvasTextBaseline } = {}): void {
+    if (pv.textless) return;
     const g = this.overlay;
     this.gameTransform();
     const size = o.size ?? 8;
@@ -400,6 +402,7 @@ export class Renderer {
 
   /** Word-wrapped text; returns the height used. */
   textWrap(str: string, x: number, y: number, maxW: number, o: { size?: number; color?: PalKey | string; lineH?: number; align?: CanvasTextAlign; alpha?: number } = {}): number {
+    if (pv.textless) return 0;
     const g = this.overlay;
     this.gameTransform();
     const size = o.size ?? 8;

@@ -44,6 +44,15 @@ verified statically (aapt2 badging, apksigner, lint: 0 errors) and the page itse
 - `src/scenes` — boot / title / menus, game, pause, options / key config, practice, records (name entry, ranking, credits),
   ending, attract demo, debug.
 
+## Promotional video
+
+`scripts/make-pv.mjs` films a 40 s, text-free PV straight from the game: `?debug` exposes `window.__dev`; the script
+stops the real-time loop and calls `__dev.advance(1)` once per video frame (frame-exact, deterministic autopilot in god
+mode), with `src/core/pv.ts` flags hiding the HUD, every bitmap / overlay text and the logo, and keeping one music
+track running across cuts. The audio mixer is rebuilt on an `OfflineAudioContext` behind a Proxy whose `currentTime` is
+the video clock, so the stage-1 theme and the gameplay SFX are scheduled exactly on the frames and rendered at the end.
+Twelve shots cut on bar lines (150 BPM, 96 frames per bar), with the drive-layer hats on in the B section.
+
 ## Testing
 
 - `npm test` (Vitest, 47 tests):
