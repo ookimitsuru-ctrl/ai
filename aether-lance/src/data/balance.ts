@@ -65,9 +65,18 @@ export const DRIVE = {
   gain: { killS: 1, killM: 4, part: 6, cell: 34, graze: 0.5, star: 0.2, maxedItem: 15, sameChip: 10 },
 };
 
-/** Player damage multipliers against midbosses and bosses (v1.1: they were too tough; their attacks are unchanged).
- *  FAN and RAY spread / pierce, so they get a little extra against a single large target. */
-export const BOSS_DMG = { base: 3.6, pulse: 1, fan: 1.8, ray: 1, other: 1 };
+/** Player damage multipliers against midbosses and bosses; their attacks are unchanged.
+ *  v1.1 made every one ×3.6. v1.1.1 sets them per stage from measured fight lengths (headless sweeps): with the
+ *  power a player normally has there (stage 1: Lv1–2 and one drone; from stage 3: Lv5, four drones and SEEKER)
+ *  a midboss takes about 10–20 s and a boss about 40–80 s, and with a weakened mid-game loadout (Lv3, two drones,
+ *  no sub weapon; tests/unit/bosses.test.ts) every one still falls within 75 % of its time limit.
+ *  FAN spreads, so it gets extra against a single large target. `base` scales everything (tests). Index = stage id. */
+export const BOSS_DMG = {
+  base: 1,
+  midboss: [1, 7, 2.2, 3.8, 1, 2.4, 2.7],
+  boss: [1, 4.5, 5.5, 3.6, 3.2, 1.2, 1.4],
+  pulse: 1, fan: 1.8, ray: 1, other: 1,
+};
 
 /** Filler waves (v1.1): keep at least `minAlive` enemies around between scripted waves. */
 export const FILLER = { minAlive: 5, cooldown: 45, firstDelay: 240, scriptGap: 45, bossGap: 360, margin: 24, minSpan: 72 };

@@ -112,6 +112,49 @@ Twelve shots cut on bar lines (150 BPM, 96 frames per bar), with the drive-layer
 - Bug fix: RAY shots reset their trail to zero points right after spawning, so they never hit anything.
 - Version 1.1.0 (replays from 1.0 are rejected).
 
+## Automated device test
+
+- `?autotest=<minutes>` (`scenes/autotest.ts`, started from `main.ts`): the look-ahead autopilot (`game/planner.ts`,
+  mortal) plays each stage in turn with the loadout a player normally has there (docs/03 §5.7), cycling the
+  difficulties (`diff=normal,hard`) and the three main weapons, continuing up to three times per attempt. Options:
+  `stages=1-6`, `speed=1..4`, `vol=0..10`. Each observation is one console line `ALTEST {json}`
+  (begin / start / death with cause / midboss / boss / clear / gameover / fps every 30 s / done); a results table is
+  shown on screen at the end. Death causes come from `World.hitSrc` (`bullet:<kind>`, `hazard:<kind>`,
+  `contact:<enemy>`, `terrain`, `crush`).
+- `game/planner.ts`: each frame it tries the 9 stick directions for 6 frames followed by each of the 9 again up to
+  26 frames ahead, predicting the player's terrain box on the exact camera path (`profile.X/Y`), bullets (linear),
+  enemy bodies (current velocity) and hazards (incl. telegraphs about to fire), and picks the safest path that lines
+  up with a target. The old potential-field bot (`bot.ts`) stays for the attract demo and the god-mode tests.
+- Android: `MainActivity` appends the launch intent's `query` extra to the start URL and forwards `ALTEST` lines and
+  page errors (`JSERR`) to logcat under the tag `AetherLance`.
+- `scripts/device-test.py` (host side, stdlib Python + adb): installs the APK, starts the test, follows logcat, polls
+  battery temperature and restarts the app if it dies, takes a screenshot every 5 minutes and, if a local LLM is
+  running (Ollama `/api/*` or OpenAI-compatible `/v1/*`), has a vision model check it; at the end it computes
+  per-difficulty/stage numbers and automatic findings and asks the LLM for a balance review → `report.md`.
+
+## v1.1.1 changes (headless balance sweep)
+
+A sweep with the look-ahead autopilot (every stage × PULSE / FAN / RAY × NORMAL / HARD, mortal, with the loadout
+a player normally has there) plus boss-fight timing runs found:
+
+- **Respawn into the wall (stage 5).** In the vertical shaft the fixed respawn point (60, 135) is inside the shaft
+  wall; the ship was pushed out to the screen edge while invulnerable and died again the moment invulnerability ran
+  out, every 5 s until the lives were gone. `World.entrySpot()` now picks the nearest spot that stays clear of terrain
+  through the entry and the invulnerability (also used after a continue).
+- **Press warning out of place (stage 5).** The press scrolls with the terrain, but its warning band stayed where the
+  press was when the warning started, so the head came down up to ~26 px left of the band. The band now follows it.
+- **Stage 1 boss hatches could not be hit.** The WARDEN's hatches sit behind the armoured bow, so straight shots never
+  reached them and phase 1 only ended by its 50 s timeout (the fight took 95–120 s; even with ×200 damage it took
+  56 s). Their hit boxes now reach forward to the bow.
+- **SEEKER fed the stage 2 boss's counter-laser.** Seekers homed on a multi-part enemy's centre, which on the GOLEM
+  is the chest crystal that absorbs hits and answers with a reflecting laser fan, so carrying SEEKER provoked attacks
+  and did no damage. Seekers now home on the nearest part that can take damage.
+- **Boss damage per stage** (`BOSS_DMG.midboss` / `.boss`, see balance.ts): the uniform ×3.6 left stage 1 long (the
+  first midboss escaped with PULSE Lv1, FAN timed out on the boss) while the late bosses melted in 4–15 s at full
+  power. Multipliers are now set so a midboss takes about 10–20 s and a boss about 40–80 s with the usual power, and
+  `bosses.test.ts` (Lv3, two drones, no sub weapon) still beats every one well within its time limit.
+- Version 1.1.1 (v1.1.0 replays are rejected).
+
 ## HD edition
 
 A second edition with modern, high-resolution art; the game itself (logic, content, audio) is shared. Build-time

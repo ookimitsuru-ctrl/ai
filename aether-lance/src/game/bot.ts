@@ -36,8 +36,20 @@ export function botInput(w: World): InputFrame {
     danger++;
     const d = Math.sqrt(d2) + 0.1;
     const k = 900 / (d * d);
-    fx += ((p.hitX - b.x) / d) * k;
-    fy += ((p.hitY - b.y) / d) * k * 1.4;
+    // sidestep: push across the bullet's path rather than straight away from it, so aimed shots do not shove the
+    // ship back into the corner (it used to sit pinned at the left edge under a stream of aimed needles)
+    const sp = Math.hypot(b.vx, b.vy);
+    const rx = p.hitX - b.x, ry = p.hitY - b.y;
+    if (sp > 0.2) {
+      if ((rx * b.vx + ry * b.vy) / sp < -8) continue; // already past
+      let nx = -b.vy / sp, ny = b.vx / sp;
+      if (rx * nx + ry * ny < 0) { nx = -nx; ny = -ny; }
+      fx += (nx * 0.8 + (rx / d) * 0.3) * k;
+      fy += (ny * 0.8 + (ry / d) * 0.3) * k * 1.4;
+    } else {
+      fx += (rx / d) * k;
+      fy += (ry / d) * k * 1.4;
+    }
   }
   for (const e of w.enemies.items) {
     if (!e.active || e.dead) continue;

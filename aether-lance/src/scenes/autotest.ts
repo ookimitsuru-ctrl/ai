@@ -18,7 +18,7 @@ import { font } from '../render/font';
 import { PAL, rgba } from '../render/palette';
 import { audio } from '../audio/engine';
 import { newRun, VERSION } from '../app';
-import { botInput } from '../game/bot';
+import { plannerInput } from '../game/planner';
 import { MENU_OK } from '../game/replay';
 import { GameScene } from './game';
 import type { World, WorldEvent } from '../game/world';
@@ -94,7 +94,7 @@ class Autotest {
     const run = newRun('arcade', diff, 'inplace');
     run.stage = stage; run.startAt = 'start'; run.loadout = loadoutFor(stage, weapon);
     let scene: GameScene | null = null;
-    const source = (w: World) => { const i = botInput(w); if (scene?.cont) i.bits |= MENU_OK; return i; };
+    const source = (w: World) => { const i = plannerInput(w); if (scene?.cont) i.bits |= MENU_OK; return i; };
     scene = new GameScene(run, undefined, source, 0);
     scene.debug = null;
     this.attempts++;

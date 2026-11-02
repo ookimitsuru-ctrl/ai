@@ -11,3 +11,5 @@ android/local.properties
 pv/
 dist-hd/
 dist-single-tmp-hd/
+device-test-*/
+__pycache__/

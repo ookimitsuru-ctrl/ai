@@ -158,8 +158,10 @@ defEnemy({
   init(e, c) {
     e.noOffscreenKill = true;
     c.part('prow', -86, 0, box(26, 14), 250, { score: 3000 });
-    c.part('hatchU', -11, -17, box(34, 12), 240, { score: 3000 });
-    c.part('hatchL', -11, 19, box(34, 12), 240, { score: 3000 });
+    // the hatches sit on the hull's flank, behind its armoured front: their hit boxes reach forward to the bow so
+    // that straight shots at hatch height can destroy them (v1.1.1; before, only the 50 s timeout ended phase 1)
+    c.part('hatchU', -11, -17, box(100, 12, -33, 0), 240, { score: 3000 });
+    c.part('hatchL', -11, 19, box(100, 12, -33, 0), 240, { score: 3000 });
     c.part('tur1', 4, -36, box(12, 8), 80, { score: 2000 });
     c.part('tur2', 40, -34, box(12, 8), 80, { score: 2000 });
     c.part('core', 44, 1, circle(11), 950, { armored: true, score: 0, contact: false });

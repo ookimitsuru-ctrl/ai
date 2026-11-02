@@ -47,13 +47,19 @@ defEnemy({
       yield Math.round(60 * k);
       const tele = Math.round(Math.max(15, c.w.cfg.teleMin * 0.5));
       e.v.shake = 1;
-      // danger zone telegraph
-      const sx = e.x, sy = e.y;
-      if (d < 2) c.telegraph('band', sx - 24, sy, sx + 24, sy + dy * (reach + 9), tele + 8);
-      else c.telegraph('band', sx, sy - 24, sx + dx * (reach + 9), sy + 24, tele + 8);
-      yield tele;
+      // danger zone telegraph; it travels with the press (which scrolls with the terrain) so it shows where the
+      // head will actually land, not where the press was when the warning started
+      const tl = c.w.addTele('band', 0, 0, 0, 0, tele + 8);
+      const place = () => {
+        if (!tl || tl.life <= 0) return;
+        const ext = e.v.ext ?? 0, sx = e.x - dx * ext, sy = e.y - dy * ext;
+        if (d < 2) { tl.x1 = sx - 24; tl.y1 = sy; tl.x2 = sx + 24; tl.y2 = sy + dy * (reach + 9); }
+        else { tl.x1 = sx; tl.y1 = sy - 24; tl.x2 = sx + dx * (reach + 9); tl.y2 = sy + 24; }
+      };
+      place();
+      for (let i = 0; i < tele; i++) { yield; place(); }
       e.v.shake = 0;
-      for (let i = 1; i <= 8; i++) { e.v.ext = (reach * i) / 8; e.wx = bx + dx * e.v.ext; e.wy = by + dy * e.v.ext; yield; }
+      for (let i = 1; i <= 8; i++) { e.v.ext = (reach * i) / 8; e.wx = bx + dx * e.v.ext; e.wy = by + dy * e.v.ext; yield; place(); }
       if (e.x > -20 && e.x < 500 && e.y > -20 && e.y < 290) { c.sfx('press_slam'); c.shake(0.1); c.w.fx.sparks(e.x + dx * 9, e.y + dy * 9, 6, PAL.O5); }
       yield Math.round(30 * k);
       for (let i = 1; i <= 40; i++) { e.v.ext = reach * (1 - i / 40); e.wx = bx + dx * e.v.ext; e.wy = by + dy * e.v.ext; yield; }

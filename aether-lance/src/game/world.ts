@@ -16,6 +16,17 @@ import { Fx } from './fx';
 import { circleVsShape, boxVsShape, segVsShape, segDist2 } from './collision';
 import { Ctx } from './script';
 
+
+/** Respawn entry candidates, nearest to the usual (60, 135) first. */
+const ENTRY_SPOTS: { x: number; y: number }[] = (() => {
+  const out: { x: number; y: number }[] = [];
+  for (const x of [60, 80, 100, 120, 150, 180, 210, 240, 270]) for (let y = 39; y <= 231; y += 12) out.push({ x, y });
+  return out.sort((a, b) => (Math.abs(a.x - 60) + Math.abs(a.y - 135) * 1.2) - (Math.abs(b.x - 60) + Math.abs(b.y - 135) * 1.2));
+})();
+/** The ship's 16×6 terrain box with a few pixels of room around it. */
+const ENTRY_BOX: [number, number][] = [];
+for (const dx of [-12, -6, 0, 6, 12]) for (const dy of [-7, 0, 7]) ENTRY_BOX.push([dx, dy]);
+
 export type WorldEvent =
   | { type: 'stageClear'; bossBonus: boolean }
   | { type: 'gameOver' }
@@ -684,7 +695,18 @@ export class World {
       if (s.kind === SHOT_SEEKER) {
         if (!s.target || !s.target.active || s.target.dead) s.target = this.nearestEnemy(s.x, s.y);
         if (s.target && s.age > 6) {
-          const a = datan2(s.target.y - s.y, s.target.x - s.x);
+          // multi-part targets: home on the nearest part that can take damage, not on the body's centre (which on
+          // the stage 2 boss is the refracting chest crystal: seekers kept feeding its counter-laser, v1.1.1)
+          let gx = s.target.x, gy = s.target.y;
+          if (s.target.parts) {
+            let bd = 1e12;
+            for (const pt of s.target.parts) {
+              if (!pt.alive || pt.armored || !pt.visible || pt.maxHp >= 1e6) continue;
+              const d = dist2(s.x, s.y, pt.x, pt.y);
+              if (d < bd) { bd = d; gx = pt.x; gy = pt.y; }
+            }
+          }
+          const a = datan2(gy - s.y, gx - s.x);
           let d = a - s.angle; while (d > 180) d -= 360; while (d < -180) d += 360;
           s.angle += clamp(d, -SEEKER.turn, SEEKER.turn);
         }
@@ -864,7 +886,7 @@ export class World {
 
   damageEnemy(e: Enemy, part: Part | null, dmg: number, fromX: number): 'hit' | 'armor' | 'none' {
     if (e.dead || !e.active) return 'none';
-    if (e === this.boss || e === this.midboss) dmg *= BOSS_DMG.base * BOSS_DMG[this.dmgSrc];
+    if (e === this.boss || e === this.midboss) dmg *= BOSS_DMG.base * ((e === this.boss ? BOSS_DMG.boss : BOSS_DMG.midboss)[this.stage.id] ?? 1) * BOSS_DMG[this.dmgSrc];
     if (e.flags & EF.INVULN || this.frame < e.invulnUntil) return 'armor';
     if (part) {
       if (!part.alive) return 'none';
@@ -1268,7 +1290,7 @@ export class World {
     return true;
   }
 
-  private hazardHits(h: Hazard, hx: number, hy: number, hr: number): boolean {
+  hazardHits(h: Hazard, hx: number, hy: number, hr: number): boolean {
     switch (h.kind) {
       case 'laser': case 'arc': case 'tendril': {
         const r = h.width / 2 - 1 + hr;
@@ -1371,8 +1393,31 @@ export class World {
     if (this.respawnMode === 'checkpoint' && !this.boss && this.phase === 'play') {
       this.restartAtCheckpoint();
     }
-    p.startEnter(-20, 60, PLAYER.respawnEnter);
+    const at = this.entrySpot();
+    p.startEnter(-20, at.x, PLAYER.respawnEnter, at.y);
     p.invuln = 0;
+  }
+
+  /**
+   * Where a respawning ship flies in to: the usual (60, 135) unless terrain is there or will scroll into it during
+   * the entry and the invulnerability after it (stage 5's vertical shaft has its wall at x = 60, which used to kill
+   * the ship again the moment its invulnerability ran out, over and over). Picks the nearest spot that stays clear.
+   */
+  entrySpot(): { x: number; y: number } {
+    const horizon = PLAYER.respawnEnter + PLAYER.respawnInvuln + 60;
+    let best = ENTRY_SPOTS[0]!, bestT = -1;
+    for (const c of ENTRY_SPOTS) {
+      let t = 0;
+      for (; t <= horizon; t += 6) {
+        const cx = this.waiting ? this.camX : this.profile.X(this.t + t), cy = this.waiting ? this.camY : this.profile.Y(this.t + t);
+        let hit = false;
+        for (const [dx, dy] of ENTRY_BOX) if (this.terrain.solid(c.x + dx + cx, c.y + dy + cy)) { hit = true; break; }
+        if (hit) break;
+      }
+      if (t > horizon) return c;
+      if (t > bestT) { bestT = t; best = c; }
+    }
+    return best;
   }
 
   /** Continue after game over (arcade): full lives, score reset with credit digit. */
@@ -1383,7 +1428,8 @@ export class World {
     this.displayScore = this.score;
     this.extIdx = 0;
     this.respawned = true;
-    this.player.startEnter(-20, 60, PLAYER.respawnEnter);
+    const at = this.entrySpot();
+    this.player.startEnter(-20, at.x, PLAYER.respawnEnter, at.y);
     this.suppressFire = PLAYER.respawnEnter + 30;
   }
 

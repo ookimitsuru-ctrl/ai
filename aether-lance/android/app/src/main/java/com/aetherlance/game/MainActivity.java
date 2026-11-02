@@ -13,6 +13,8 @@ import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.util.Log;
+import android.webkit.ConsoleMessage;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -37,6 +39,7 @@ import java.util.Map;
 public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
     private static final String START_URL = "https://" + HOST + "/index.html";
+    private static final String TAG = "AetherLance";
 
     private WebView web;
 
@@ -78,7 +81,16 @@ public class MainActivity extends Activity {
         s.setTextZoom(100);                           // ignore the system font size; the game scales itself
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);    // assets come from the APK; never serve a stale copy
 
-        web.setWebChromeClient(new WebChromeClient());
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onConsoleMessage(ConsoleMessage m) {
+                // automated test reports ("ALTEST {json}", see src/scenes/autotest.ts) go to logcat for a host script
+                String t = m.message();
+                if (t != null && t.startsWith("ALTEST ")) { Log.i(TAG, t); return true; }
+                if (m.messageLevel() == ConsoleMessage.MessageLevel.ERROR) Log.w(TAG, "JSERR " + t + " @" + m.sourceId() + ":" + m.lineNumber());
+                return false;
+            }
+        });
         web.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
@@ -109,7 +121,19 @@ public class MainActivity extends Activity {
         });
         setContentView(web);
         web.requestFocus();
-        web.loadUrl(START_URL);
+        web.loadUrl(START_URL + startQuery());
+    }
+
+    /**
+     * Optional query string from the launch intent, e.g. for the automated device test:
+     *   adb shell am start -n com.aetherlance.game/.MainActivity --es query "autotest=60&diff=normal,hard"
+     * Only plain parameter characters are accepted.
+     */
+    private String startQuery() {
+        Intent i = getIntent();
+        String q = i != null ? i.getStringExtra("query") : null;
+        if (q == null || q.isEmpty() || !q.matches("[A-Za-z0-9=&,.\\-]{1,200}")) return "";
+        return "?" + q;
     }
 
     /** Serve /path from assets/www/path. */
