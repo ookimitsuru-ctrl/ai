@@ -137,7 +137,11 @@ export function parseMML(source: string, defaultInst = 'lead_pulse'): TrackData 
     }
     if (c === 'r') {
       i++;
-      const len = length(defLen);
+      let len = length(defLen);
+      for (;;) {
+        skipWs();
+        if (s[i] === '&' || s[i] === '^') { i++; skipWs(); if (s[i] === 'r') i++; len += length(defLen); } else break;
+      }
       tick += len;
       lastNotes = [];
       continue;

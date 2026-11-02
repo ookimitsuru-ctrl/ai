@@ -28,7 +28,7 @@ describe('songs', () => {
         expect(tr.data.total, `${def.id}.${tr.name} total`).toBe(s.total);
         if (!def.noLoop) expect(tr.data.loop, `${def.id}.${tr.name} loop`).toBe(s.loop);
       }
-      expect(s.total % 192, `${def.id} whole bars`).toBe(0);
+      expect(s.total % (def.meter ?? 192), `${def.id} whole bars`).toBe(0);
     });
   }
 });

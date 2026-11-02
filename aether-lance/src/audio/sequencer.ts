@@ -11,6 +11,7 @@ export interface SongDef {
   sends?: Record<string, { rev?: number; del?: number }>;
   vol?: Record<string, number>;
   noLoop?: boolean;
+  meter?: number;                         // ticks per bar (default 192 = 4/4)
 }
 
 export interface ParsedSong {

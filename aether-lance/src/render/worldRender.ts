@@ -588,6 +588,18 @@ export class WorldView {
             break;
           }
           const molten = h.kind === 'molten';
+          if (h.color === 1) {
+            // organic tentacle column
+            const grow = Math.min(1, h.age / 6);
+            const top = h.y < 135;
+            const len = Math.round(h.h * grow);
+            const y0 = top ? h.y : h.y + h.h - len;
+            g.fillStyle = PAL.F1; g.fillRect(Math.round(h.x), Math.round(y0), Math.round(h.w), len);
+            g.fillStyle = PAL.F3; g.fillRect(Math.round(h.x + 3), Math.round(y0), 4, len);
+            g.fillStyle = PAL.T3; for (let yy = 4; yy < len; yy += 10) g.fillRect(Math.round(h.x + h.w / 2), Math.round(y0 + yy), 2, 2);
+            g.fillStyle = PAL.F0; g.fillRect(Math.round(h.x), Math.round(top ? y0 + len - 2 : y0), Math.round(h.w), 2);
+            break;
+          }
           g.fillStyle = molten ? PAL.O3 : PAL.R1;
           g.fillRect(Math.round(h.x), Math.round(h.y), Math.round(h.w), Math.round(h.h));
           g.fillStyle = molten ? PAL.O5 : PAL.R3;

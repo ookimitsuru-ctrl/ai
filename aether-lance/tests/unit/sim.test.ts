@@ -1,8 +1,7 @@
 // Headless simulation: the autopilot (god mode) plays each stage to the end; must clear without errors,
 // and two runs with identical input must produce identical state (determinism, docs/02 §8).
 import { describe, it, expect } from 'vitest';
-import '../../src/content/enemies/common';
-import '../../src/content/bosses/st1';
+import '../../src/content/index';
 import { ALL_STAGES } from '../../src/content/stages/index';
 import { World, type WorldEvent } from '../../src/game/world';
 import { botInput } from '../../src/game/bot';
