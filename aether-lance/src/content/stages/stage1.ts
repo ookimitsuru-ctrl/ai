@@ -81,6 +81,12 @@ export const stage1: StageDef = {
   theme: 'hull', bgId: 'orbit', scroll0: 0.75, events: ev,
   checkpoints: [{ id: 'start', at: 0 }, { id: 'cp1', at: s(85) }, { id: 'cp2', at: s(165) }, { id: 'cp3', at: s(215) }],
   midbossAt: s(135), bossAt: s(215),
+  fillers: [
+    { id: 'dart', behavior: 'sine', count: 5, interval: 16, p: { phase: 0 } },
+    { id: 'swirl', behavior: 'loop', count: 5, interval: 12, p: { dir: 1 } },
+    { id: 'dart', behavior: 'dive', count: 4, interval: 16 },
+    { id: 'weaver', count: 2, interval: 30 },
+  ],
   build(b, X) {
     const R = (t: number) => X(s(t)) + 480;
     // D: ring exterior hull

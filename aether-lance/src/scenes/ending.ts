@@ -74,8 +74,8 @@ export class EndingScene implements Scene {
     const sx = Math.min(240, -30 + k * 0.8) + (k > 1400 ? (k - 1400) * 2 : 0);
     const sy = 150 + Math.sin(k * 0.02) * 6 - (k > 1400 ? (k - 1400) * 0.5 : 0);
     g.globalCompositeOperation = 'lighter';
-    g.fillStyle = PAL.O5; g.fillRect(Math.round(sx - 24), Math.round(sy) - 1, 9, 3);
-    drawGlow(g, sx - 18, sy, 10, PAL.O5, 0.6);
+    g.fillStyle = PAL.C4; g.fillRect(Math.round(sx - 27), Math.round(sy) - 2, 9, 2); g.fillRect(Math.round(sx - 27), Math.round(sy) + 2, 9, 2);
+    drawGlow(g, sx - 21, sy, 10, PAL.C3, 0.6);
     g.globalCompositeOperation = 'source-over';
     drawSprite(g, SPR.kestrel!, 2, sx, sy);
     const h = renderer.hud;

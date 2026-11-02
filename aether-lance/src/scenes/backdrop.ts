@@ -97,8 +97,8 @@ export class Backdrop {
       this.fly++;
       const x = -40 + this.fly * 5, y = 200 - this.fly * 0.9;
       g.globalCompositeOperation = 'lighter';
-      for (let k = 0; k < 30; k++) { g.fillStyle = k < 6 ? PAL.O5 : k < 16 ? PAL.C3 : PAL.C1; g.fillRect(Math.round(x - 16 - k * 4), Math.round(y + k * 0.72), 4, 1); }
-      drawGlow(g, x - 14, y, 10, PAL.O5, 0.6);
+      for (let k = 0; k < 30; k++) { g.fillStyle = k < 6 ? PAL.C5 : k < 16 ? PAL.C3 : PAL.C1; g.fillRect(Math.round(x - 19 - k * 4), Math.round(y + k * 0.72), 4, 1); }
+      drawGlow(g, x - 18, y, 10, PAL.C4, 0.6);
       g.globalCompositeOperation = 'source-over';
       drawSprite(g, SPR.kestrel!, 1, x, y);
       if (x > 560) this.fly = -1;

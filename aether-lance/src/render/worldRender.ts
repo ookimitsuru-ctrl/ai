@@ -305,7 +305,9 @@ export class WorldView {
     // engine flame
     const len = [4, 7, 10, 13][p.speedLv - 1]! + (p.moveX > 0.3 ? 3 : p.moveX < -0.3 ? -2 : 0) + (fxRng.next() < 0.5 ? 1 : 0);
     g.globalCompositeOperation = 'lighter';
-    this.drawFlame(g, x - 15, y, len);
+    // twin ion engines of the Mk.II (nozzles at the rear, 4 px apart)
+    this.drawFlame(g, x - 18, y - 1.5, Math.round(len * 0.85));
+    this.drawFlame(g, x - 18, y + 2.5, Math.round(len * 0.85));
     if (p.driving) drawGlow(g, x, y, 26, PAL.Y3, 0.35 + 0.15 * Math.sin(w.frame * 0.4));
     g.globalCompositeOperation = 'source-over';
     // speed-change afterimages
@@ -320,7 +322,7 @@ export class WorldView {
       g.globalAlpha = 1;
     }
     drawSprite(g, SPR.kestrel!, 2 + p.bank, x, y);
-    if (p.muzzle > 0) { g.fillStyle = PAL.N8; g.fillRect(Math.round(x + 15), Math.round(y) - 1, 3, 3); }
+    if (p.muzzle > 0) { g.fillStyle = PAL.N8; g.fillRect(Math.round(x + 19), Math.round(y) - 1, 3, 3); }
     g.globalAlpha = 1;
     this.drawBarrier(g, x, y);
     if (o.hitbox || p.godMode && this.hitboxes) {
@@ -332,10 +334,10 @@ export class WorldView {
 
   /** Engine exhaust behind the ship; (x, y) is the nozzle, len the flame length (additive blending is set). */
   protected drawFlame(g: CanvasRenderingContext2D, x: number, y: number, len: number): void {
-    const fx = Math.round(x), fy = Math.round(y);
-    g.fillStyle = PAL.O3; g.fillRect(fx - len, fy - 2, len, 4);
-    g.fillStyle = PAL.O5; g.fillRect(fx - Math.round(len * 0.75), fy - 1, Math.round(len * 0.75), 3);
-    g.fillStyle = PAL.O6; g.fillRect(fx - Math.round(len * 0.45), fy - 1, Math.round(len * 0.45), 2);
+    const fx = Math.round(x), fy = Math.round(y - 0.5);
+    g.fillStyle = PAL.C1; g.fillRect(fx - len, fy - 1, len, 3);
+    g.fillStyle = PAL.C3; g.fillRect(fx - Math.round(len * 0.7), fy - 1, Math.round(len * 0.7), 3);
+    g.fillStyle = PAL.C5; g.fillRect(fx - Math.round(len * 0.4), fy, Math.round(len * 0.4), 1);
     g.fillStyle = PAL.N8; g.fillRect(fx - 2, fy, 2, 1);
   }
 

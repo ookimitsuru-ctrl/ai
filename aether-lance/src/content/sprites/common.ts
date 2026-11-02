@@ -4,30 +4,48 @@ import { build, reg } from './registry';
 import type { PalKey } from '../../render/palette';
 
 export function buildCommon(): void {
-  // ---- KESTREL (30×14), frames: bank -2,-1,0,+1,+2 -------------------------------------------
-  reg('kestrel', build(32, 16, 5, (b, f, M) => {
-    const bank = f - 2; // -2 up .. +2 down
-    const wingBot = 13 + (bank > 0 ? 1 : bank < 0 ? bank * 0.8 : 0);
-    const wingBack = bank > 0 ? 5 : 6;
-    // lower delta wing (behind body)
-    b.poly([10, 9, 19, 9, 12 - bank * 0.5, wingBot, wingBack, wingBot], M.armorL);
-    // far wing visible when banking down
-    if (bank > 0) b.poly([11, 5, 17, 5, 12, 2.2 - bank * 0.3, 8, 2.2 - bank * 0.3], M.armor);
-    // dorsal fin
-    b.poly([4, 5.5, 7, 1.2 + (bank < 0 ? 0.6 : 0), 9.5, 1.2 + (bank < 0 ? 0.6 : 0), 11.5, 5.2], M.armorL);
-    // fuselage
-    b.poly([3, 5, 10, 4, 18, 4.3, 24, 5.8, 27, 7.2, 24, 8.6, 18, 9.6, 10, 10, 3, 9.6], M.hull);
-    // engine block
-    b.rect(1, 5, 3, 5, M.dark);
-    // lance barrel
-    b.line(24, 7, 30, 7, M.armorL);
-    // canopy
-    b.ellipse(19.5, 5.6 + bank * 0.15, 3.4, 1.7, M.glass);
-    // details
-    b.pxLine(8, 7 + (bank > 0 ? 0 : 0), 20, 7, 'C3');
-    b.px(30, 7, 'N8');
-    b.px(2, 6, 'O5'); b.px(2, 7, 'O6'); b.px(2, 8, 'O5');
-    b.px(12, 5, 'N8'); b.px(13, 5, 'N8');
+  // ---- KESTREL Mk.II (40×20), frames: bank -2,-1,0,+1,+2 (v1.1 redesign) ------------------------------
+  // Heavy space fighter: white armour with red bands, twin propellant tanks (the far one shows above the hull),
+  // long laser cannons on the wing tips above and below, twin blue ion engines at the rear.
+  reg('kestrel', build(40, 20, 5, (b, f, M) => {
+    const bank = f - 2; // -2 up .. +2 down (seen a little more from above / below)
+    const red = b.mat({ ramp: ['O0', 'O1', 'O2'], bevel: 2 });
+    const tank = b.mat({ ramp: ['N4', 'N5', 'N6', 'N7', 'N8'], bevel: 4, shine: 'N8' });
+    const tankFar = b.mat({ ramp: ['N3', 'N4', 'N5', 'N6'], bevel: 3 });
+    const yU = 3 + bank * 0.35, yL = 17.5 + bank * 0.2;            // cannon lines
+    const yF = 6.2 + bank * 0.35, yN = 13.6 - bank * 0.15;          // tank centre lines
+    // upper (far) wing strut + cannon
+    b.poly([14, yU + 0.6, 19, yU + 0.6, 21, 8.2, 16, 8.2], M.plate);
+    b.rect(12, Math.round(yU - 1), 8, 2, M.armorL);
+    b.line(19, Math.round(yU), 36, Math.round(yU), M.armorL);
+    b.rect(31, Math.round(yU) - 1, 2, 2, M.dark);
+    // far propellant tank (behind the hull)
+    b.ellipse(15.5, yF, 7.8, 2.5, tankFar);
+    b.rect(17, Math.round(yF - 2.2), 2, 4, red);
+    // twin ion engines
+    b.rect(3, 7, 5, 3, M.dark); b.rect(3, 11, 5, 3, M.dark);
+    b.rect(2, 7, 1, 3, M.glowC); b.rect(2, 11, 1, 3, M.glowC);
+    // fuselage: long armoured wedge with a sharp nose
+    b.poly([6, 8, 13, 7.4, 22, 7.6, 28, 8.4, 34, 9.4, 39.5, 10.5, 34, 11.4, 28, 12.1, 22, 12.6, 13, 12.7, 6, 12.3], M.hull);
+    b.poly([27, 9.6, 35, 10.2, 35, 10.8, 27, 10.9], red);              // red nose stripe
+    // canopy on the spine
+    b.ellipse(25, 8.1 + bank * 0.1, 3.9, 1.25, M.glass);
+    // lower (near) wing strut
+    b.poly([12, yL - 0.6, 18, yL - 0.6, 20, 14, 15, 14], M.plate);
+    // near propellant tank with its red band
+    b.ellipse(15, yN, 8, 3.1, tank);
+    b.rect(17, Math.round(yN - 2.8), 2, 6, red);
+    b.rect(7, Math.round(yN - 1), 1, 2, M.dark);                  // tank rear valve
+    // lower cannon (nearest)
+    b.rect(11, Math.round(yL) - 1, 8, 2, M.armorL);
+    b.line(18, Math.round(yL), 35, Math.round(yL), M.armorL);
+    b.rect(30, Math.round(yL) - 1, 2, 2, M.dark);
+    // panel lines and details
+    b.pxLine(11, Math.round(yN) - 2, 11, Math.round(yN) + 2, 'N4');
+    b.pxLine(22, Math.round(yN) - 2, 22, Math.round(yN) + 1, 'N4');
+    b.pxLine(29, 11, 33, 11, 'N3');
+    b.px(37, Math.round(yU), 'C4'); b.px(36, Math.round(yL), 'C4'); // cannon muzzles
+    b.px(1, 8, 'C5'); b.px(1, 12, 'C5');                          // engine cores
   }));
 
   // ---- WISP drone (12×12, 6 frames) ---------------------------------------------------------------

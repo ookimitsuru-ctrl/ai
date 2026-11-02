@@ -69,6 +69,11 @@ export const stage4: StageDef = {
   theme: 'ruins', bgId: 'storm', scroll0: 1.5, events: ev,
   checkpoints: [{ id: 'start', at: 0 }, { id: 'cp1', at: s(110) }, { id: 'cp2', at: s(180) }, { id: 'cp3', at: s(215) }],
   midbossAt: s(150), bossAt: s(215),
+  fillers: [
+    { id: 'dart', behavior: 'sine', count: 5, interval: 14, p: { speed: 2.6, phase: 0 } },
+    { id: 'dart', behavior: 'straight', count: 5, interval: 12, p: { speed: 2.4 } },
+    { id: 'weaver', count: 3, interval: 20, p: { speed: 2 } },
+  ],
   build(b, X) {
     const R = (t: number) => X(s(t)) + 480;
     // D: floating ruins of a cloud city

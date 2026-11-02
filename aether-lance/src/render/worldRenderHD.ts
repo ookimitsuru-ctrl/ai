@@ -114,22 +114,23 @@ export class WorldViewHD extends WorldView {
 
   // ---- exhaust ------------------------------------------------------------------------------------------
   protected override drawFlame(g: CanvasRenderingContext2D, x: number, y: number, len: number): void {
+    // blue ion exhaust
     const L0 = len + 3;
     const grd = g.createLinearGradient(x - L0, 0, x + 1, 0);
-    grd.addColorStop(0, 'rgba(217,96,28,0)'); grd.addColorStop(0.35, 'rgba(245,143,42,0.55)');
-    grd.addColorStop(0.75, 'rgba(255,191,77,0.95)'); grd.addColorStop(1, 'rgba(255,240,200,1)');
+    grd.addColorStop(0, 'rgba(28,138,192,0)'); grd.addColorStop(0.35, 'rgba(51,183,232,0.55)');
+    grd.addColorStop(0.75, 'rgba(127,224,255,0.95)'); grd.addColorStop(1, 'rgba(230,250,255,1)');
     g.fillStyle = grd;
     g.beginPath();
-    g.moveTo(x + 1, y - 2.4);
-    g.bezierCurveTo(x - L0 * 0.4, y - 2.6, x - L0 * 0.8, y - 0.8, x - L0, y);
-    g.bezierCurveTo(x - L0 * 0.8, y + 0.8, x - L0 * 0.4, y + 2.6, x + 1, y + 2.4);
+    g.moveTo(x + 1, y - 1.6);
+    g.bezierCurveTo(x - L0 * 0.4, y - 1.8, x - L0 * 0.8, y - 0.5, x - L0, y);
+    g.bezierCurveTo(x - L0 * 0.8, y + 0.5, x - L0 * 0.4, y + 1.8, x + 1, y + 1.6);
     g.closePath(); g.fill();
     // inner core
     const core = g.createLinearGradient(x - L0 * 0.5, 0, x + 1, 0);
     core.addColorStop(0, 'rgba(255,255,255,0)'); core.addColorStop(1, 'rgba(255,255,255,0.95)');
     g.fillStyle = core;
-    g.beginPath(); g.ellipse(x - L0 * 0.22, y, L0 * 0.28, 0.9, 0, 0, TAU); g.fill();
-    drawGlow(g, x - 1, y, 6, PAL.O4, 0.55);
+    g.beginPath(); g.ellipse(x - L0 * 0.22, y, L0 * 0.28, 0.7, 0, 0, TAU); g.fill();
+    drawGlow(g, x - 1, y, 5, PAL.C3, 0.6);
   }
 
   // ---- particles ---------------------------------------------------------------------------------------

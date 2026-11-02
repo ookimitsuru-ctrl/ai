@@ -15,6 +15,7 @@ import { IB } from './game/player';
 import { newRun } from './app';
 import { pv } from './core/pv';
 import { backdrop } from './scenes/backdrop';
+import { SPR } from './content/sprites/registry';
 import { font } from './render/font';
 import { PAL } from './render/palette';
 import dotGothicUrl from './assets/fonts/DotGothic16-subset.woff2?url';
@@ -115,7 +116,7 @@ function boot(): void {
         __scenes: scenes, __renderer: renderer,
         // hooks for scripts/make-pv.mjs (frame-exact capture) and other tooling
         __dev: {
-          scenes, renderer, audio, save, pv, backdrop, GameScene, TitleScene, botInput, newRun, IB,
+          scenes, renderer, audio, save, pv, backdrop, SPR, GameScene, TitleScene, botInput, newRun, IB,
           /** stop the real-time loop; the caller advances frames with advance() */
           manual(on: boolean) { manual = on; },
           /** run n fixed 60 Hz updates, then draw one frame */

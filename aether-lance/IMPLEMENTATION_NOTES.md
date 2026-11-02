@@ -97,6 +97,21 @@ Twelve shots cut on bar lines (150 BPM, 96 frames per bar), with the drive-layer
 - The SHOULD "survival bot" that searches for unavoidable bullet situations (10 §3) is covered only partially: the autopilot
   clears all stages and defeats every boss, but there is no automated "no escape" detector.
 
+## v1.1 changes
+
+- Player ship redesigned as the KESTREL Mk.II (40×20 sprite in `content/sprites/common.ts`): white armour with red
+  bands, twin propellant tanks, wing-tip laser cannons, twin blue ion engines (flame at x-18, y-1.5 / y+2.5; muzzle at
+  x+19). Hitbox unchanged. HUD lives icon, classic icon (generated from the sprite by `scripts/make-icons.cjs`) and the
+  HD vector icon (`scripts/make-icons-hd.cjs`) follow the new design.
+- Filler waves (`World.stepFillers`, `StageDef.fillers` / `fillersV`, `FILLER` in balance.ts): between scripted waves,
+  whenever fewer than 5 enemies are around, a stage-specific formation enters from an open spot on the right edge
+  (the top edge in vertical-scroll sections). Not within 45 frames of a scripted spawn, not in the 6 s before a midboss
+  or boss, not in stage 6's silence. Uses the game RNG, so runs stay deterministic.
+- Boss damage (`BOSS_DMG`): player damage vs. the midboss / boss ×3.6 (FAN ×1.8 on top); attacks unchanged.
+  `bosses.test.ts` now requires every midboss and boss to fall to a Lv3 / two-drone loadout with each main weapon.
+- Bug fix: RAY shots reset their trail to zero points right after spawning, so they never hit anything.
+- Version 1.1.0 (replays from 1.0 are rejected).
+
 ## HD edition
 
 A second edition with modern, high-resolution art; the game itself (logic, content, audio) is shared. Build-time

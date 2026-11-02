@@ -9,7 +9,7 @@ import type { PlayerLoadout } from './game/entities';
 import { encodeFrames, decodeFrames, type Recorder, type StoredReplay } from './game/replay';
 import type { InputFrame } from './game/player';
 
-export const VERSION = 'v1.0.0';
+export const VERSION = 'v1.1.0';
 
 export const STAGES: StageDef[] = [];
 export function registerStage(s: StageDef): void { STAGES[s.id - 1] = s; }

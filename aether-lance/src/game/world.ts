@@ -2,7 +2,7 @@
 import { Rng, fxRng } from '../core/rng';
 import { datan2, dcos, dsin, dist2, clamp } from '../core/dmath';
 import type { Difficulty } from '../core/save';
-import { DIFFICULTY, DRIVE, FAIRNESS, PLAYER, SCORE, BOMB, SEEKER, DRONE, type DiffCfg } from '../data/balance';
+import { DIFFICULTY, DRIVE, FAIRNESS, PLAYER, SCORE, BOMB, SEEKER, DRONE, BOSS_DMG, FILLER, type DiffCfg } from '../data/balance';
 import { PAL } from '../render/palette';
 import {
   Pool, Shot, Bullet, Item, Enemy, Hazard, Tele, Particle, Popup, EF, SHOT_PULSE, SHOT_FAN, SHOT_RAY, SHOT_BOMB, SHOT_SEEKER,
@@ -61,6 +61,8 @@ export class World {
   evIdx = 0;
   waiting: null | 'midboss' | 'boss' = null;
   pending: { at: number; ev: SpawnEv; i: number; fid: number }[] = [];
+  /** frames until the next filler formation may be sent */
+  fillerCd = FILLER.firstDelay;
   events: WorldEvent[] = [];
   sfxQ: { id: string; x: number }[] = [];
   musicQ: MusicCmd[] = [];
@@ -273,7 +275,58 @@ export class World {
       const p = this.pending[i]!;
       if (p.at <= this.t) { this.pending.splice(i, 1); this.spawnMember(p.ev, p.i, p.fid); }
     }
+    this.stepFillers();
     this.t++;
+  }
+
+  /** Filler waves: between scripted waves, keep a steady stream of the stage's small enemies coming. */
+  private stepFillers(): void {
+    const list = this.stage.fillers;
+    if (!list?.length || this.phase !== 'play' || this.waiting || this.stageData.silence || this.player.state === 'gone') return;
+    if (this.fillerCd > 0) { this.fillerCd--; return; }
+    // stay out of the way of scripted spawns and boss entrances
+    const evs = this.stage.events;
+    for (let i = this.evIdx; i < evs.length; i++) {
+      const e = evs[i]!;
+      const dt = e.at - this.t;
+      if (dt > FILLER.bossGap) break;
+      if ((e.type === 'midboss' || e.type === 'boss') || (e.type === 'spawn' && dt <= FILLER.scriptGap)) { this.fillerCd = 20; return; }
+    }
+    let alive = this.pending.length;
+    for (const e of this.enemies.items) if (e.active && !e.dead && !(e.flags & (EF.BACKGROUND | EF.NO_SCORE)) && e.size !== 'B' && e.size !== 'L') alive++;
+    if (alive >= FILLER.minAlive) { this.fillerCd = 15; return; }
+    if (Math.abs(this.scrollVY) > 0.3) {
+      // vertical shaft: come down from the top, inside the open part of the shaft
+      const vl = this.stage.fillersV;
+      if (!vl?.length) { this.fillerCd = 30; return; }
+      const sy = 14 + this.camY;
+      let lx = 240, rx = 240;
+      if (this.terrain.solid(240 + this.camX, sy)) { this.fillerCd = 20; return; }
+      while (lx > 8 && !this.terrain.solid(lx - 4 + this.camX, sy)) lx -= 4;
+      while (rx < 472 && !this.terrain.solid(rx + 4 + this.camX, sy)) rx += 4;
+      const xs = rx - lx - FILLER.margin * 2;
+      if (xs < 8) { this.fillerCd = 20; return; }
+      const tv = vl[Math.floor(this.rng.next() * vl.length)]!;
+      const x = Math.round(lx + FILLER.margin + this.rng.next() * xs);
+      this.runEvent({ ...tv, at: this.t, type: 'spawn', x, y: -20, p: { ...(tv.p ?? {}) } });
+      this.fillerCd = FILLER.cooldown;
+      return;
+    }
+    // a free corridor at the right edge
+    const sx = 470 + this.camX;
+    let top = 135, bot = 135;
+    if (this.terrain.solid(sx, 135 + this.camY)) { this.fillerCd = 20; return; }
+    while (top > 8 && !this.terrain.solid(sx, top - 4 + this.camY)) top -= 4;
+    while (bot < 262 && !this.terrain.solid(sx, bot + 4 + this.camY)) bot += 4;
+    const span = bot - top - FILLER.margin * 2;
+    if (span < FILLER.minSpan - FILLER.margin * 2) { this.fillerCd = 20; return; }
+    const tpl = list[Math.floor(this.rng.next() * list.length)]!;
+    const y = Math.round(top + FILLER.margin + this.rng.next() * Math.max(0, span));
+    const ev: SpawnEv = { ...tpl, at: this.t, type: 'spawn', y, p: { ...(tpl.p ?? {}) } };
+    if (ev.p && 'dir' in ev.p) ev.p.dir = y < 135 ? 1 : -1; // loops curl toward the open side
+    if (ev.p && 'phase' in ev.p) ev.p.phase = this.rng.next() < 0.5 ? 0 : 180;
+    this.runEvent(ev);
+    this.fillerCd = FILLER.cooldown;
   }
 
   private runEvent(e: TimelineEv, fastForward = false): void {
@@ -340,6 +393,7 @@ export class World {
 
   /** Re-create world state at timeline time `at` without spawning (checkpoint restart / practice). */
   fastForward(at: number): void {
+    this.fillerCd = FILLER.firstDelay;
     this.t = 0; this.evIdx = 0;
     this.camX = 0; this.camY = 0;
     this.scrollVX = this.sToX = this.stage.scroll0; this.scrollVY = this.sToY = 0; this.sRamp = this.sRampLen = 0;
@@ -805,8 +859,12 @@ export class World {
   }
 
   /** Apply damage to an enemy (part-aware). Returns 'hit' | 'armor' | 'none'. */
+  /** weapon behind the current damageEnemy call (set by the shot code), for the boss damage multiplier */
+  dmgSrc: 'pulse' | 'fan' | 'ray' | 'other' = 'other';
+
   damageEnemy(e: Enemy, part: Part | null, dmg: number, fromX: number): 'hit' | 'armor' | 'none' {
     if (e.dead || !e.active) return 'none';
+    if (e === this.boss || e === this.midboss) dmg *= BOSS_DMG.base * BOSS_DMG[this.dmgSrc];
     if (e.flags & EF.INVULN || this.frame < e.invulnUntil) return 'armor';
     if (part) {
       if (!part.alive) return 'none';
@@ -1048,7 +1106,9 @@ export class World {
         }
         const target = this.shotTarget(s, e);
         if (!target) continue;
+        this.dmgSrc = s.kind === SHOT_PULSE ? 'pulse' : s.kind === SHOT_FAN ? 'fan' : 'other';
         const res = this.damageEnemy(e, target === true ? null : target, s.dmg, s.x - s.vx * 3);
+        this.dmgSrc = 'other';
         s.active = false;
         if (res === 'hit') { this.sfx(e.def.hitSound ?? 'hit_enemy', s.x); this.fx.sparks(s.x, s.y, 2, s.gold ? PAL.Y4 : PAL.C4, s.angle + 180, 100, 1.5, 6); }
         else if (res === 'armor') { this.sfx('hit_armor', s.x); this.fx.sparks(s.x, s.y, 3, PAL.Y3, s.angle + 180, 90, 2, 6); }
@@ -1181,7 +1241,9 @@ export class World {
       s.vx = 0; s.vy = 0; s.life = Math.min(s.life, 3);
       return true;
     }
+    this.dmgSrc = 'ray';
     const res = this.damageEnemy(e, hitPart, s.dmg, s.x - 20);
+    this.dmgSrc = 'other';
     if (res === 'armor' && (e.flags & EF.ARMORED || e.armorFront)) {
       this.sfx('hit_armor', s.x); this.fx.sparks(s.x, s.y, 4, PAL.Y3);
       s.vx = 0; s.vy = 0; s.life = Math.min(s.life, 3);

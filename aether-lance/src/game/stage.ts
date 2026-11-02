@@ -37,6 +37,9 @@ export type TimelineEv =
   | { at: number; type: 'call'; fn: (w: World) => void; state?: boolean }
   | { at: number; type: 'checkpoint'; id: 'cp1' | 'cp2' | 'cp3' };
 
+/** Filler formation (v1.1): spawned between scripted waves whenever the screen runs low on enemies. */
+export type FillerTpl = Omit<SpawnEv, 'at' | 'type' | 'y' | 'bonus' | 'carrier' | 'loop2' | 'warn' | 'snap' | 'wx' | 'wy'>;
+
 export interface StageDef {
   id: number;
   nameEn: string;
@@ -58,6 +61,10 @@ export interface StageDef {
   checkpoints: { id: 'start' | 'cp1' | 'cp2' | 'cp3'; at: number }[];
   midbossAt: number;
   bossAt: number;
+  /** filler formations that keep the action continuous between scripted waves (docs/12 §2) */
+  fillers?: FillerTpl[];
+  /** fillers for vertical-scroll sections: spawned at the top edge (x is chosen in the open shaft) */
+  fillersV?: FillerTpl[];
 }
 
 /** Integrate the static scroll profile → camera position at timeline time t. */

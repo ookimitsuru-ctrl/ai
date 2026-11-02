@@ -25,44 +25,59 @@ function draw(size, layer) {
     g.fillStyle = pg; g.fillRect(0, 0, size, size);
     return c.toDataURL('image/png');
   }
-  // ship, fitted into the 66 dp safe zone, nose up-right
-  const S = 60 * u / 32;
+  // KESTREL Mk.II, fitted into the 66 dp safe zone, nose up-right (same layout as the 40×20 game sprite)
+  const S = 64 * u / 40;
   g.save();
   g.translate(size / 2, size / 2);
-  g.rotate(-0.22);
+  g.rotate(-0.2);
   g.scale(S, S);
-  g.translate(-16, -7.2);
+  g.translate(-20, -10.5);
   const mono = layer === 'mono';
   const poly = (pts) => { g.beginPath(); g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]); g.closePath(); };
-  if (!mono) {
-    // lance beam + engine glow
-    const beam = g.createLinearGradient(-40, 0, 30, 0);
-    beam.addColorStop(0, 'rgba(51,183,232,0)'); beam.addColorStop(1, 'rgba(127,224,255,0.9)');
-    g.fillStyle = beam; g.fillRect(-40, 6.6, 70, 0.8);
-    const eg = g.createRadialGradient(1, 7.2, 0, 1, 7.2, 7);
-    eg.addColorStop(0, 'rgba(255,240,200,1)'); eg.addColorStop(0.3, 'rgba(255,170,60,0.8)'); eg.addColorStop(1, 'rgba(217,96,28,0)');
-    g.fillStyle = eg; g.beginPath(); g.ellipse(-1, 7.2, 8, 3, 0, 0, 7); g.fill();
-  }
-  const fill = (pts, a, b, c2) => {
-    poly(pts);
-    if (mono) { g.fillStyle = '#fff'; g.fill(); return; }
-    const gr = g.createLinearGradient(0, 2, 0, 11); gr.addColorStop(0, a); gr.addColorStop(0.5, b); gr.addColorStop(1, c2);
-    g.fillStyle = gr; g.fill();
-    g.lineWidth = 0.35; g.strokeStyle = 'rgba(10,16,32,0.9)'; g.stroke();
+  const shade = (y0, y1, a, b, c2) => { const gr = g.createLinearGradient(0, y0, 0, y1); gr.addColorStop(0, a); gr.addColorStop(0.45, b); gr.addColorStop(1, c2); return gr; };
+  const fillPath = (style) => { g.fillStyle = mono ? '#fff' : style; g.fill(); if (!mono) { g.lineWidth = 0.28; g.strokeStyle = 'rgba(8,12,24,0.9)'; g.stroke(); } };
+  const tankAt = (cx, cy, rx, ry, light) => {
+    g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, 7);
+    fillPath(light ? shade(cy - ry, cy + ry, '#ffffff', '#c6d2e3', '#5c6f94') : shade(cy - ry, cy + ry, '#c6d2e3', '#8a9cbc', '#3a4a6c'));
+    if (!mono) {
+      g.save(); g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, 7); g.clip();
+      g.fillStyle = shade(cy - ry, cy + ry, '#c8573a', '#a33a14', '#5e1c0a'); g.fillRect(cx + 1.8, cy - ry, 2.2, ry * 2);
+      g.strokeStyle = 'rgba(40,50,80,0.5)'; g.lineWidth = 0.2;
+      for (const dx of [-4.5, 6.5]) { g.beginPath(); g.moveTo(cx + dx, cy - ry); g.lineTo(cx + dx, cy + ry); g.stroke(); }
+      g.restore();
+    }
   };
-  fill([10, 9, 19, 9, 12, 13, 6, 13], '#c6d2e3', '#97a9c6', '#44587e');          // lower wing
-  fill([4, 5.5, 7, 1.2, 9.5, 1.2, 11.5, 5.2], '#e6eefb', '#97a9c6', '#6a7fa3');    // dorsal fin
-  fill([3, 5, 10, 4, 18, 4.3, 24, 5.8, 27, 7.2, 24, 8.6, 18, 9.6, 10, 10, 3, 9.6], '#ffffff', '#c6d2e3', '#6a7fa3'); // fuselage
   if (!mono) {
-    g.fillStyle = '#2d3c5e'; g.fillRect(1, 5, 3, 5);
-    g.strokeStyle = '#c6d2e3'; g.lineWidth = 1; g.lineCap = 'round'; g.beginPath(); g.moveTo(24.5, 7.2); g.lineTo(30.5, 7.2); g.stroke();
-    const cg = g.createLinearGradient(16, 4, 23, 7.5); cg.addColorStop(0, '#d4f7ff'); cg.addColorStop(0.5, '#33b7e8'); cg.addColorStop(1, '#135e8a');
-    g.fillStyle = cg; g.beginPath(); g.ellipse(19.5, 5.7, 3.4, 1.7, 0, 0, 7); g.fill();
-    g.fillStyle = 'rgba(255,255,255,0.8)'; g.beginPath(); g.ellipse(18.6, 5.1, 1.3, 0.45, -0.2, 0, 7); g.fill();
-    g.strokeStyle = '#33b7e8'; g.lineWidth = 0.6; g.beginPath(); g.moveTo(8, 7.2); g.lineTo(20, 7.2); g.stroke();
-    const tip = g.createRadialGradient(30.8, 7.2, 0, 30.8, 7.2, 2.4); tip.addColorStop(0, '#ffffff'); tip.addColorStop(1, 'rgba(127,224,255,0)');
-    g.fillStyle = tip; g.beginPath(); g.arc(30.8, 7.2, 2.4, 0, 7); g.fill();
-  } else { g.strokeStyle = '#fff'; g.lineWidth = 1; g.beginPath(); g.moveTo(24.5, 7.2); g.lineTo(30.5, 7.2); g.stroke(); }
+    for (const ey of [8.5, 12.5]) {
+      const eg = g.createRadialGradient(2, ey, 0, 2, ey, 6);
+      eg.addColorStop(0, 'rgba(230,250,255,1)'); eg.addColorStop(0.35, 'rgba(127,224,255,0.75)'); eg.addColorStop(1, 'rgba(28,138,192,0)');
+      g.fillStyle = eg; g.beginPath(); g.ellipse(-0.5, ey, 6, 2, 0, 0, 7); g.fill();
+    }
+  }
+  // upper strut + cannon (far side)
+  poly([14, 3.6, 19, 3.6, 21, 8.2, 16, 8.2]); fillPath('#8a9cbc');
+  g.beginPath(); g.roundRect(12, 2.1, 8, 1.8, 0.5); fillPath(shade(2, 4, '#e6eefb', '#a9b8d2', '#6a7fa3'));
+  g.beginPath(); g.roundRect(19, 2.6, 18, 0.9, 0.4); fillPath(shade(2.6, 3.5, '#e6eefb', '#a9b8d2', '#6a7fa3'));
+  tankAt(15.5, 6.2, 7.8, 2.5, false);
+  // engines
+  g.beginPath(); g.roundRect(3, 7, 5, 3, 0.6); fillPath('#2d3c5e');
+  g.beginPath(); g.roundRect(3, 11, 5, 3, 0.6); fillPath('#2d3c5e');
+  // hull
+  poly([6, 8, 13, 7.4, 22, 7.6, 28, 8.4, 34, 9.4, 39.5, 10.5, 34, 11.4, 28, 12.1, 22, 12.6, 13, 12.7, 6, 12.3]);
+  fillPath(shade(7.4, 12.7, '#ffffff', '#d4dcea', '#7a8bab'));
+  if (!mono) { poly([27, 9.6, 35, 10.2, 35, 10.8, 27, 10.9]); g.fillStyle = '#a33a14'; g.fill(); }
+  // canopy
+  g.beginPath(); g.ellipse(25, 8.1, 3.9, 1.25, 0, 0, 7);
+  if (!mono) { const cg = g.createLinearGradient(21, 7, 28, 9.3); cg.addColorStop(0, '#d4f7ff'); cg.addColorStop(0.45, '#33b7e8'); cg.addColorStop(1, '#0e2a4a'); g.fillStyle = cg; g.fill(); g.fillStyle = 'rgba(255,255,255,0.75)'; g.beginPath(); g.ellipse(24, 7.6, 1.5, 0.35, -0.1, 0, 7); g.fill(); }
+  else { g.fillStyle = '#fff'; g.fill(); }
+  // lower strut, near tank, lower cannon
+  poly([12, 16.9, 18, 16.9, 20, 14, 15, 14]); fillPath('#8a9cbc');
+  tankAt(15, 13.6, 8, 3.1, true);
+  g.beginPath(); g.roundRect(11, 16.6, 8, 1.8, 0.5); fillPath(shade(16.6, 18.4, '#e6eefb', '#a9b8d2', '#6a7fa3'));
+  g.beginPath(); g.roundRect(18, 17.1, 18, 0.9, 0.4); fillPath(shade(17.1, 18, '#e6eefb', '#a9b8d2', '#6a7fa3'));
+  if (!mono) {
+    for (const [mx, my] of [[37.4, 3.05], [36.4, 17.55]]) { const tg = g.createRadialGradient(mx, my, 0, mx, my, 1.8); tg.addColorStop(0, '#ffffff'); tg.addColorStop(1, 'rgba(127,224,255,0)'); g.fillStyle = tg; g.beginPath(); g.arc(mx, my, 1.8, 0, 7); g.fill(); }
+  }
   g.restore();
   return c.toDataURL('image/png');
 }

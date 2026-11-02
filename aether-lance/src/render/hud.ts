@@ -10,7 +10,8 @@ let fade = 1;
 let hiShown = 0;
 
 export function drawHud(g: CanvasRenderingContext2D, w: World, hi: number, label: string): void {
-  shipIcon ??= fromStrings({ map: { W: 'N7', C: 'C3', O: 'O5', K: 'N1' }, frames: [['..KK.....', 'OWWWWCCK.', 'OKWWWWWWK', '..KWW....']] });
+  // KESTREL Mk.II silhouette: far tank, hull with canopy and red stripe, near tank, twin blue engines
+  shipIcon ??= fromStrings({ map: { W: 'N7', G: 'N5', R: 'O2', C: 'C3', B: 'C4' }, frames: [['...GGRG.....', 'B.WWWWWWCC..', 'BWWWRWWWWRWW', '..WWWRWW....', '...GGGGGG...']] });
   const f = font();
   const p = w.player;
   const near = p.alive && (p.y < 12 + 24 || p.y > 256 - 24);
@@ -40,8 +41,8 @@ export function drawHud(g: CanvasRenderingContext2D, w: World, hi: number, label
   f.draw(g, label, 476, 2, 'N6', 1, 'right');
   // bottom: lives
   const lives = Math.max(0, w.lives);
-  if (lives <= 4) for (let i = 0; i < lives; i++) g.drawImage(shipIcon.canvas, 4 + i * 11, 260, shipIcon.w, shipIcon.h);
-  else { g.drawImage(shipIcon.canvas, 4, 260, shipIcon.w, shipIcon.h); f.draw(g, '×' + lives, 15, 259, 'N8'); }
+  if (lives <= 3) for (let i = 0; i < lives; i++) g.drawImage(shipIcon.canvas, 4 + i * 13, 260, shipIcon.w, shipIcon.h);
+  else { g.drawImage(shipIcon.canvas, 4, 260, shipIcon.w, shipIcon.h); f.draw(g, '×' + lives, 18, 259, 'N8'); }
   // speed
   if (!p.touch) {
     f.draw(g, 'SPD', 52, 259, 'N6');

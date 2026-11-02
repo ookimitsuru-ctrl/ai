@@ -52,6 +52,11 @@ export const stage3: StageDef = {
   theme: 'flesh', bgId: 'hive', scroll0: 0.7, events: ev,
   checkpoints: [{ id: 'start', at: 0 }, { id: 'cp1', at: s(100) }, { id: 'cp2', at: s(155) }, { id: 'cp3', at: s(215) }],
   midbossAt: s(120), bossAt: s(215),
+  fillers: [
+    { id: 'leech', count: 4, interval: 14 },
+    { id: 'dart', behavior: 'sine', count: 4, interval: 16, p: { phase: 0 } },
+    { id: 'spore', p: { home: 0, sp: 0.9, life: 600, a: 180 } },
+  ],
   build(b, X) {
     const R = (t: number) => X(s(t)) + 480;
     b.floor([[R(1), 0], [R(3), 26], [R(38), 26], [R(40), 34], [R(72), 34], [R(75), 40], [R(98), 40], [R(100), 30], [R(107), 30], [R(109), 30]], { rough: 8, seed: 31 });

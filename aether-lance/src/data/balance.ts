@@ -65,6 +65,13 @@ export const DRIVE = {
   gain: { killS: 1, killM: 4, part: 6, cell: 34, graze: 0.5, star: 0.2, maxedItem: 15, sameChip: 10 },
 };
 
+/** Player damage multipliers against midbosses and bosses (v1.1: they were too tough; their attacks are unchanged).
+ *  FAN and RAY spread / pierce, so they get a little extra against a single large target. */
+export const BOSS_DMG = { base: 3.6, pulse: 1, fan: 1.8, ray: 1, other: 1 };
+
+/** Filler waves (v1.1): keep at least `minAlive` enemies around between scripted waves. */
+export const FILLER = { minAlive: 5, cooldown: 45, firstDelay: 240, scriptGap: 45, bossGap: 360, margin: 24, minSpan: 72 };
+
 export const SCORE = {
   pointBlankR: 48, formationPer: 300, graze: 50, star: 10,
   maxedItem: 5000, aegisRefill: 2000, driveFull: 3000, sameChip: 3000, subMax: 3000,

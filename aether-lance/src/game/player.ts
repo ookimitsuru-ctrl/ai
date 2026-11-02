@@ -336,7 +336,7 @@ function emitMain(w: World, x: number, y: number, dmgK: number, drone: boolean):
   } else {
     const L = RAY[lv]!;
     const s = w.spawnShot(SHOT_RAY, x, y, 0, L.speed, L.dmg * dmgK, gold, drone, L.len, L.width);
-    if (s) { s.len = L.len; s.nt = 0; }
+    if (s) s.len = L.len; // spawnShot already starts the trail with two points at the muzzle (nt = 2)
   }
 }
 

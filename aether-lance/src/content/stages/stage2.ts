@@ -67,6 +67,11 @@ export const stage2: StageDef = {
   theme: 'cave', bgId: 'cave', dark: true, scroll0: 0.6, events: ev,
   checkpoints: [{ id: 'start', at: 0 }, { id: 'cp1', at: s(95) }, { id: 'cp2', at: s(165) }, { id: 'cp3', at: s(215) }],
   midbossAt: s(135), bossAt: s(215),
+  fillers: [
+    { id: 'swirl', behavior: 'loop', count: 5, interval: 12, p: { dir: 1 } },
+    { id: 'dart', behavior: 'sine', count: 4, interval: 18, p: { phase: 0 } },
+    { id: 'geode', p: { vx: -0.2, vy: 0 } },
+  ],
   build(b, X) {
     const R = (t: number) => X(s(t)) + 480;
     // A: entrance

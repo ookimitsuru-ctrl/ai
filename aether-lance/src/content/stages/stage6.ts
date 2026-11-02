@@ -44,6 +44,10 @@ export const stage6: StageDef = {
   theme: 'choir', bgId: 'choir', beatBpm: 150, scroll0: 2.0, events: ev,
   checkpoints: [{ id: 'start', at: 0 }, { id: 'cp1', at: s(85) }, { id: 'cp2', at: s(145) }, { id: 'cp3', at: s(210) }],
   midbossAt: s(110), bossAt: s(210),
+  fillers: [
+    { id: 'dart', behavior: 'straight', count: 5, interval: 10, p: { speed: 3.4 } },
+    { id: 'dart', behavior: 'sine', count: 5, interval: 14, p: { phase: 0 } },
+  ],
   onUpdate(w) {
     // resonance walls: two halves alternate every 2 beats; they light up one beat before turning solid
     const b = w.beatIndex();

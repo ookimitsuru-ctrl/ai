@@ -78,6 +78,14 @@ export const stage5: StageDef = {
   theme: 'foundry', bgId: 'foundry', scroll0: 0.8, events: ev, worldTop: Math.floor(Yf) - 300, worldBottom: 272,
   checkpoints: [{ id: 'start', at: 0 }, { id: 'cp1', at: s(95) }, { id: 'cp2', at: s(165) }, { id: 'cp3', at: s(215) }],
   midbossAt: s(135), bossAt: s(215),
+  fillers: [
+    { id: 'dart', behavior: 'sine', count: 5, interval: 16, p: { phase: 0 } },
+    { id: 'dart', behavior: 'straight', count: 4, interval: 14 },
+    { id: 'dart', behavior: 'dive', count: 4, interval: 16 },
+  ],
+  fillersV: [
+    { id: 'dart', behavior: 'fall', count: 4, interval: 14 },
+  ],
   onUpdate(w) {
     const p = w.player;
     let push = w.stageData.forcePush ?? 0;
