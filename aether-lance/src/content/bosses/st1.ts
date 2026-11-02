@@ -113,7 +113,8 @@ defEnemy({
 // ---- B1 WARDEN --------------------------------------------------------------------------------------------
 const HULL = [box(186, 52, 8, 0), box(110, 72, 14, 0), box(40, 18, -86, 0)];
 // armour leaves a channel in front of the core (y -12..+14) so shots can reach the shutter/core
-const HULL_ARMOR = [box(186, 18, 8, -17), box(186, 18, 8, 19), box(110, 20, 14, -26), box(110, 20, 14, 26), box(60, 26, 70, 1)];
+// (v1.1.1: the two flank bands reached -8 and +10, leaving only an 18 px channel instead of the intended 26 px)
+const HULL_ARMOR = [box(186, 14, 8, -19), box(186, 14, 8, 21), box(110, 20, 14, -26), box(110, 20, 14, 26), box(60, 26, 70, 1)];
 
 function* wardenPhase2(e: Enemy, c: Ctx) {
   for (let f = 0; f <= 5; f++) { e.v.shut = f; yield 10; }

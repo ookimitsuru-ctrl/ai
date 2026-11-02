@@ -146,7 +146,8 @@ a player normally has there) plus boss-fight timing runs found:
   press was when the warning started, so the head came down up to ~26 px left of the band. The band now follows it.
 - **Stage 1 boss hatches could not be hit.** The WARDEN's hatches sit behind the armoured bow, so straight shots never
   reached them and phase 1 only ended by its 50 s timeout (the fight took 95–120 s; even with ×200 damage it took
-  56 s). Their hit boxes now reach forward to the bow.
+  56 s). Their hit boxes now reach forward to the bow. The armour channel in front of the core was also narrower
+  than designed (18 px instead of the 26 px the code comment describes); it now matches.
 - **SEEKER fed the stage 2 boss's counter-laser.** Seekers homed on a multi-part enemy's centre, which on the GOLEM
   is the chest crystal that absorbs hits and answers with a reflecting laser fan, so carrying SEEKER provoked attacks
   and did no damage. Seekers now home on the nearest part that can take damage.
