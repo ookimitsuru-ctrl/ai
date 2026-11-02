@@ -146,11 +146,11 @@ defEnemy({
         const s = id === 'wU' ? SPR.cantor_wing! : SPR.cantor_wing!.flipY;
         if (w.alive) drawSprite(g, s, open, x + w.ox, y + w.oy, w.flash > 0);
       }
-      const body = P(e, 'body');
-      drawSprite(g, SPR.cantor_body!, e.v.sing ? 1 : 0, x + body.ox, y + body.oy, body.flash > 0);
+      const body = e.parts!.find((p) => p.id === 'body');
+      if (body?.alive) drawSprite(g, SPR.cantor_body!, e.v.sing ? 1 : 0, x + body.ox, y + body.oy, body.flash > 0);
     } else if (form === 3) {
-      const core = P(e, 'sil');
-      if (core.alive) {
+      const core = e.parts!.find((p) => p.id === 'sil');
+      if (core?.alive) {
         // trail
         g.fillStyle = PAL.R3;
         if (e.v.dash) stampLine(g, x + core.ox - (e.v.dx ?? 0) * 6, y + core.oy - (e.v.dy ?? 0) * 6, x + core.ox, y + core.oy, 3);

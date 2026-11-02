@@ -164,7 +164,7 @@ export class GameScene implements Scene {
     }
     w.musicQ.length = 0;
     // keep the music locked to the game clock on beat-synced stages
-    if (w.stage.beatBpm && audio.music && audio.currentSong() === w.musicId && this.t % 30 === 0) {
+    if (w.stage.beatBpm && audio.music && audio.currentSong() === w.musicId && this.t % 15 === 0) {
       const expected = ((w.frame - w.musicStartFrame) * w.stage.beatBpm * 48) / 3600;
       audio.music.syncTo(expected);
     }

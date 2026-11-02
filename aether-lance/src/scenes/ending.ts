@@ -21,6 +21,7 @@ import type { RunState } from '../app';
 export class EndingScene implements Scene {
   t = 0;
   hold = 0;
+  armed = false; // skip only after the button has been released once (no carry-over from gameplay)
   stars = new StarField(5);
   confirm = new Confirm();
   asked = false;
@@ -29,7 +30,9 @@ export class EndingScene implements Scene {
   update(): void {
     this.t++;
     if (this.confirm.active) { this.confirm.update(); if (!this.confirm.active && this.asked) this.finish(); return; }
-    if (input.held[4] || input.held[10] || input.pointer.down) this.hold++; else this.hold = 0;
+    const down = !!(input.held[4] || input.held[10] || input.pointer.down);
+    if (!down) this.armed = true;
+    if (down && this.armed) this.hold++; else this.hold = 0;
     const END = 60 * 75;
     if (this.hold > 60 || this.t > END) {
       if (this.offerLoop2 && !this.asked) {

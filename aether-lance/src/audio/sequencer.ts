@@ -226,9 +226,12 @@ export class MusicPlayer {
   syncTo(expectedTick: number): void {
     if (!this.song || this.paused) return;
     const diffSec = (this.currentTick() - expectedTick) * this.spt;
-    if (Math.abs(diffSec) > 0.03 && Math.abs(diffSec) < 2) {
-      const step = Math.max(-0.02, Math.min(0.02, diffSec));
-      this.startTime += step;
+    if (Math.abs(diffSec) > 0.25 && Math.abs(diffSec) < 4) {
+      // large drift (frame drops / tab stalls): re-anchor in one step
+      this.startTime += diffSec;
+      this.seek(Math.max(0, Math.ceil(this.currentTick())));
+    } else if (Math.abs(diffSec) > 0.02) {
+      this.startTime += Math.max(-0.04, Math.min(0.04, diffSec));
     }
   }
 
