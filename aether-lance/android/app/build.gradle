@@ -1,14 +1,14 @@
-// AETHER LANCE for Android: a thin native shell around the single-file web build.
-// The game itself is ../../dist-single/aether-lance.html (run `npm run build:single` in aether-lance/ first,
-// or use ../build-apk.sh which does everything).
+// AETHER LANCE for Android: a thin native shell around the single-file web build, in two editions (flavours):
+//   classic — pixel art, com.aetherlance.game,    ../../dist-single/aether-lance.html    (npm run build:single)
+//   hd      — modern HD art, com.aetherlance.game.hd, ../../dist-single/aether-lance-hd.html (npm run build:single:hd)
+// ../build-apk.sh builds both web files and both APKs.
 plugins { id 'com.android.application' }
 
 def pkg = new groovy.json.JsonSlurper().parse(file('../../package.json'))
 def (vMajor, vMinor, vPatch) = pkg.version.tokenize('.').collect { it as int }
 
-def webHtml = file('../../dist-single/aether-lance.html')
-def webLicense = file('../../public/licenses/DotGothic16-OFL.txt')
-def webAssetsDir = layout.buildDirectory.dir('generated/webassets')
+def editions = [classic: file('../../dist-single/aether-lance.html'), hd: file('../../dist-single/aether-lance-hd.html')]
+def licensesDir = file('../../public/licenses')
 
 android {
     namespace 'com.aetherlance.game'
@@ -30,6 +30,19 @@ android {
             keyPassword 'aetherlance'
         }
     }
+    flavorDimensions += 'edition'
+    productFlavors {
+        classic {
+            dimension 'edition'
+            resValue 'string', 'app_name', 'AETHER LANCE'
+        }
+        hd {
+            dimension 'edition'
+            applicationIdSuffix '.hd'
+            versionNameSuffix '-hd'
+            resValue 'string', 'app_name', 'AETHER LANCE HD'
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
@@ -40,7 +53,8 @@ android {
         }
     }
     sourceSets {
-        main { assets.srcDirs += webAssetsDir }
+        classic { assets.srcDirs += layout.buildDirectory.dir('generated/webassets/classic').get().asFile }
+        hd { assets.srcDirs += layout.buildDirectory.dir('generated/webassets/hd').get().asFile }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -51,15 +65,18 @@ android {
     }
 }
 
-// Copy the web build into the APK's assets (served from https://appassets.androidplatform.net/ by MainActivity).
-def copyWebAssets = tasks.register('copyWebAssets', Copy) {
-    doFirst {
-        if (!webHtml.exists()) {
-            throw new GradleException("Missing ${webHtml}. Run `npm run build:single` in aether-lance/ first (or ./build-apk.sh).")
+// Copy each edition's web build into its APK assets (served from https://appassets.androidplatform.net/ by MainActivity).
+editions.each { name, html ->
+    def cap = name.capitalize()
+    def copy = tasks.register("copyWebAssets${cap}", Copy) {
+        doFirst {
+            if (!html.exists()) {
+                throw new GradleException("Missing ${html}. Run `npm run build:single${name == 'hd' ? ':hd' : ''}` in aether-lance/ first (or ./build-apk.sh).")
+            }
         }
+        from(html) { rename { 'index.html' } }
+        from(licensesDir) { into 'licenses' }
+        into layout.buildDirectory.dir("generated/webassets/${name}/www")
     }
-    from(webHtml) { rename { 'index.html' } }
-    from(webLicense) { into 'licenses' }
-    into webAssetsDir.map { it.dir('www') }
+    tasks.configureEach { t -> if (t.name ==~ /pre${cap}(Debug|Release)Build/) t.dependsOn copy }
 }
-tasks.named('preBuild') { dependsOn copyWebAssets }

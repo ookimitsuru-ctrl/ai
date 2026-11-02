@@ -254,6 +254,35 @@ await scenario('android shell: app-assets origin, offline, back button', async (
   await page.screenshot({ path: path.join(out, 'android_shell.png') });
 }, { ...devices['Pixel 7 landscape'] });
 
+await scenario('HD edition boots and plays (file://)', async (page) => {
+  const f = path.join(root, 'dist-single/aether-lance-hd.html');
+  if (!fs.existsSync(f)) throw new Error('missing ' + f + ' (npm run build:single:hd)');
+  await page.goto('file://' + f + '?debug=1');
+  await waitFor(page, (v) => v.name === 'BootScene', 15000);
+  const rs = await page.evaluate(() => window.__renderer.rs);
+  if (!(rs >= 2)) throw new Error('HD render scale not active: ' + rs);
+  await page.waitForTimeout(600);
+  await press(page, 'KeyZ');
+  await waitFor(page, (v) => v.name === 'TitleScene');
+  await page.waitForTimeout(900);
+  await press(page, 'Enter');
+  await waitFor(page, (v) => v.name === 'MainMenuScene');
+  await page.waitForTimeout(300);
+  await press(page, 'Enter');
+  await waitFor(page, (v) => v.name === 'DifficultyScene');
+  await page.waitForTimeout(300);
+  await press(page, 'Enter');
+  await waitFor(page, (v) => v.name === 'GameScene' && v.state === 'play', 15000);
+  // play until the first wave is shot down (the HD build may run below 60 fps in a software-rendered browser)
+  await page.keyboard.down('KeyZ');
+  let v = await top(page);
+  for (let i = 0; i < 40 && !(v.score > 0); i++) { await page.waitForTimeout(500); v = await top(page); }
+  await page.keyboard.up('KeyZ');
+  if (!(v.score > 0)) throw new Error('no score in HD: ' + JSON.stringify(v));
+  if (!(await canvasNotBlack(page))) throw new Error('HD canvas is black');
+  await page.screenshot({ path: path.join(out, 'hd_game.png') });
+});
+
 server.close();
 console.log(results.join('\n'));
 process.exit(failures ? 1 : 0);

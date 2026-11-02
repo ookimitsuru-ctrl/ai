@@ -97,18 +97,25 @@ Twelve shots cut on bar lines (150 BPM, 96 frames per bar), with the drive-layer
 - The SHOULD "survival bot" that searches for unavoidable bullet situations (10 §3) is covered only partially: the autopilot
   clears all stages and defeats every boss, but there is no automated "no escape" detector.
 
-## HD edition (in progress — resume from here)
+## HD edition
 
-Goal (user request): a separate high-quality edition with modern, smoothly shaded characters and backgrounds,
-shipped as its own APK. Same game logic and content; only rendering changes. Build-time switch `__HD__`
-(`AL_EDITION=hd`), `src/core/hd.ts` (`HD`, `RS` = render scale 3, `snap`, `blit`, logical canvas size `k`).
-Done so far:
-- `src/render/spriteHD.ts`: SB primitives are recorded (`SB.ops`) and re-rasterised at RS×2 with continuous ramp
-  shading, Blinn-Phong gloss, rim light, AA outline, 2×2 downsample. `Sprite.k`, `drawSprite` uses logical size,
-  `glow/drawGlow`, `flipX/Y`, `rotations` (smooth), `frameCanvas`, pixel-string sprites (`upscalePixelArt`).
-- `src/render/draw.ts`: smooth disc / ring / stroke / dashed line / glow in HD.
-- `src/render/renderer.ts`: game + HUD canvases at RS× with a transform, linear sampling, bloom chain sized for HD.
-To do: build scripts (`build:hd`, `build:single:hd`), terrain HD painting, background layers at RS× (`layerCanvas`,
-`blit`, continuous `rampPick`/`paintCanvas`), star field, HD world effects (shots, flame, particles, breakables,
-dynamic walls, hazards), vector HUD/menu text, logo, title planet, default settings (CRT off, FIT, soft),
-Android product flavours (classic / hd, applicationId `com.aetherlance.game.hd`), CI + docs, screenshots review.
+A second edition with modern, high-resolution art; the game itself (logic, content, audio) is shared. Build-time
+switch `__HD__` (`AL_EDITION=hd`: `npm run build:hd`, `npm run build:single:hd`); Android flavour `hd`
+(`com.aetherlance.game.hd`, label "AETHER LANCE HD", own launcher icon from `scripts/make-icons-hd.cjs`).
+`src/core/hd.ts` holds `HD`, the render scale `RS` (3, or 2 on devices with ≤ 3 GB memory or ≤ 4 cores) and helpers
+for canvases stored at RS× but drawn in game units (`k`, `lw`/`lh`, `blit`, `snap`).
+- Renderer: game and HUD canvases RS× with a matching transform (all drawing code stays in 480×270 units), linear
+  sampling, bloom chain sized to the larger texture. Defaults: FIT, soft, CRT off. Own save and replay keys.
+- Sprites (`spriteHD.ts`): the sprite builder records its primitives; they are re-rasterised at RS×2 with continuous
+  ramp shading, Blinn-Phong gloss, rim light, a thin AA outline and a 2×2 downsample. Smooth rotations, soft carrier
+  halo, glaze-style hit flash; pixel-string sprites are edge-smoothed.
+- Terrain (`terrainRenderHD.ts`, `terrainThemesHD.ts`): bilinear occupancy → anti-aliased contours, a continuous
+  distance-field normal, and one continuous-colour material per theme; chunks are painted RS× in time-sliced jobs
+  ahead of the camera.
+- Backgrounds: `paintCanvas` at 2× with the ordered dither blurred into smooth colour (alpha kept crisp), vector
+  layers via `layerCanvas` at RS×, round twinkling stars.
+- Effects (`worldRenderHD.ts`): cached glowing bolts for PULSE / FAN, layered beams for RAY, lasers, lightning and
+  arcs; gradient exhaust; soft particles; bevelled breakables; smooth wave walls and rhythm walls; continuous wave arcs.
+- Text: bitmap-font calls draw Rajdhani (bundled OFL subset) sized to the pixel font's cap height; Japanese uses the
+  system sans-serif; chrome logo; gradient HUD plates for readability on bright stages.
+- e2e: "HD edition boots and plays" (render scale active, scoring, canvas not black).

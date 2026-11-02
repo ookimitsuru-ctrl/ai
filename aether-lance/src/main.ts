@@ -20,7 +20,7 @@ import { PAL } from './render/palette';
 import dotGothicUrl from './assets/fonts/DotGothic16-subset.woff2?url';
 import rajdhani600 from './assets/fonts/Rajdhani-600.woff2?url';
 import rajdhani700 from './assets/fonts/Rajdhani-700.woff2?url';
-import { HD, TEXT_FONT } from './core/hd';
+import { HD, TEXT_FONT, setRenderScale } from './core/hd';
 
 // DotGothic16 (subset) — Copyright 2020 The DotGothic16 Project Authors, SIL Open Font License 1.1.
 // The notice ships in index.html and the full license in public/licenses/ (appended to the single-file build).
@@ -81,6 +81,12 @@ function showError(err: unknown): void {
 }
 
 function boot(): void {
+  // HD edition: 3× art on capable devices, 2× on small ones (decided before any canvas or sprite is built)
+  if (HD) {
+    const nav = navigator as Navigator & { deviceMemory?: number };
+    const weak = (nav.deviceMemory !== undefined && nav.deviceMemory <= 3) || (navigator.hardwareConcurrency || 8) <= 4;
+    setRenderScale(weak ? 2 : 3);
+  }
   loadFont();
   installAndroidBack();
   save.data = loadSave();

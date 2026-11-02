@@ -5,6 +5,7 @@
 - 全6ステージ。各ステージに中ボスとボスがいて、ステージ6のあとに2周目があります。
 - グラフィック・BGM・効果音は、すべてコードで生成しています。画像ファイルや音声ファイルは使っていません。
 - PC（キーボード／ゲームパッド）とスマートフォン（タッチ）の両方で遊べます。Android 用の APK もあります。
+- **2つの版があります。** ドット絵の「通常版」と、同じゲームを現代的な高解像度グラフィックで描き直した「HD 版」です（下記「HD 版について」）。
 - 設計書は [`docs/`](docs/README.md) にあります。実装上の補足は [`IMPLEMENTATION_NOTES.md`](IMPLEMENTATION_NOTES.md) にまとめました。
 
 ---
@@ -22,14 +23,26 @@
 
 ### B. Android アプリ（APK）で遊ぶ
 
-- **APK の入手:** リポジトリの [`dist/AetherLance.apk`](../dist/AetherLance.apk) をダウンロードします。Actions の実行結果の Artifacts `aether-lance-apk` からも入手できます。
+- **APK の入手:** 通常版はリポジトリの [`dist/AetherLance.apk`](../dist/AetherLance.apk)、HD 版は [`dist/AetherLanceHD.apk`](../dist/AetherLanceHD.apk) です。Actions の実行結果の Artifacts `aether-lance-apk` からも入手できます。2つは別のアプリ（`com.aetherlance.game` と `com.aetherlance.game.hd`）なので、両方を同時にインストールできます。セーブデータも別々です。
 - **インストール:** Android 端末で APK を開き、「提供元不明のアプリ」のインストールを許可してインストールします（Android 8.0 以上）。
 - 横画面・全画面で起動します。インターネット接続は不要で、通信の権限も持っていません。
 - **戻るボタン:** ゲーム中はポーズ、メニューでは「戻る」として働きます。タイトル画面で押すとアプリを終了します。
 - セーブデータ（設定・ハイスコア・リプレイ）はアプリ内に保存されます。新しい版の APK は、上書きインストールでデータを引き継げます（すべての版を同じ鍵で署名しています）。
 - Bluetooth のゲームパッドやキーボードもそのまま使えます。
 
-APK は、ゲーム本体（単一HTML版）を全画面の WebView で動かす小さなアプリです（約170KB）。作り方は「3. 開発」を参照してください。
+APK は、ゲーム本体（単一HTML版）を全画面の WebView で動かす小さなアプリです（通常版 約170KB、HD 版 約420KB）。作り方は「3. 開発」を参照してください。
+
+### HD 版について
+
+ゲームの中身（ステージ、敵、ボス、音楽、操作、バランス）は通常版と同じで、絵だけを現代的な高品位グラフィックに描き直した版です。
+
+- **キャラクター:** 自機・敵・ボスを、同じ設計図から3倍の解像度で作り直します。ドットの色段階ではなく連続した陰影に、光沢（スペキュラ）とリムライトを加え、輪郭はアンチエイリアスで滑らかにしています。
+- **地形:** 輪郭を滑らかな曲線に描き直し、ステージごとに新しい質感を付けています（宇宙ステーションの金属パネル、洞窟の岩と結晶、有機体の組織、嵐の遺跡の石材、鋳造所のハザード塗装、聖堂の大理石と金の象眼）。
+- **背景:** ディザのない滑らかなグラデーション、丸く瞬く星、滑らかな遠景レイヤー。
+- **エフェクト:** 光るエネルギー弾とビーム、グラデーションの噴射炎、柔らかい爆発や火の粉、レーザーや雷、溶岩流。
+- **文字:** HUD とメニューはベクターフォント（Rajdhani）、日本語は端末の標準ゴシック体。ロゴもクロームの立体的なデザインに変えています。
+- 既定の画面設定は FIT（画面いっぱい）・CRT 効果なしです。描画は3倍の解像度で行い、メモリや CPU コア数が少ない端末では自動で2倍に下げます。重いときは OPTIONS → VIDEO → Quality を LOW にしてください。
+- ブラウザで遊ぶ場合は `npm run build:single:hd` で `dist-single/aether-lance-hd.html` を作ります。
 
 ### C. GitHub Pages で遊ぶ
 
@@ -177,7 +190,8 @@ Node.js 22 以上を推奨します（Vite 8 の要件）。実行時の依存�
 | `npm test` | ユニットテスト（MML とステージの拍の整合、全ステージの自動クリア、全ボスの撃破、決定性、リプレイ） |
 | `npm run lint` | 型チェックのみ |
 | `npm run e2e` | Playwright による E2E テスト（先に `build` と `build:single` が必要） |
-| `./android/build-apk.sh` | Android 用 APK を `dist-apk/AetherLance.apk` にビルド（JDK 17 以上、Gradle 8.7 以上、Android SDK の platform 34 が必要。`ANDROID_HOME` を設定しておく） |
+| `npm run build:hd` ／ `npm run build:single:hd` | HD 版を `dist-hd/` ／ `dist-single/aether-lance-hd.html` にビルド |
+| `./android/build-apk.sh` | 通常版と HD 版の APK を `dist-apk/AetherLance.apk` と `dist-apk/AetherLanceHD.apk` にビルド（JDK 17 以上、Gradle 8.7 以上、Android SDK の platform 34 が必要。`ANDROID_HOME` を設定しておく） |
 | `node scripts/make-pv.mjs` | 40秒のプロモーション映像（文字なし・ゲーム内の BGM と効果音つき、1080p 60fps）を `pv/aether-lance-pv.mp4` に書き出す（先に `build:single` が必要。ffmpeg を使う。`--preview` で低解像度の試し書き） |
 | `node scripts/subset-font.mjs` | 画面に出す文字を増やしたときに、埋め込みフォント（DotGothic16 のサブセット）を作り直す |
 
@@ -214,6 +228,6 @@ android/      Android アプリ（WebView のシェル。MainActivity.java が A
 ## 4. クレジット
 
 - ゲームデザイン、プログラム、グラフィック、音楽、効果音: AETHER LANCE 制作チーム（Claude Code で開発）
-- フォント: [DotGothic16](https://fonts.google.com/specimen/DotGothic16)（Copyright 2020 The DotGothic16 Project Authors、SIL Open Font License 1.1。ライセンス全文は `public/licenses/DotGothic16-OFL.txt`）
+- フォント: [DotGothic16](https://fonts.google.com/specimen/DotGothic16)（Copyright 2020 The DotGothic16 Project Authors）、HD 版は [Rajdhani](https://fonts.google.com/specimen/Rajdhani)（Copyright 2014 Indian Type Foundry）。どちらも SIL Open Font License 1.1 で、ライセンス全文は `public/licenses/` にあります。
 
 本作は特定の既存作品の再現や移植ではない、オリジナル作品です。
