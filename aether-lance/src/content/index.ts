@@ -5,16 +5,19 @@ import { buildEnemies2 } from './sprites/enemies2';
 import { buildEnemies3 } from './sprites/enemies3';
 import { buildEnemies4 } from './sprites/enemies4';
 import { buildEnemies5 } from './sprites/enemies5';
+import { buildEnemies6 } from './sprites/enemies6';
 import './enemies/common';
 import './enemies/st2';
 import './enemies/st3';
 import './enemies/st4';
 import './enemies/st5';
+import './enemies/st6';
 import './bosses/st1';
 import './bosses/st2';
 import './bosses/st3';
 import './bosses/st4';
 import './bosses/st5';
+import './bosses/st6';
 
 export function buildAllSprites(): void {
   buildCommon();
@@ -23,4 +26,5 @@ export function buildAllSprites(): void {
   buildEnemies3();
   buildEnemies4();
   buildEnemies5();
+  buildEnemies6();
 }

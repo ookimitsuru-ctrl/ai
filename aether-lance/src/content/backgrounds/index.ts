@@ -4,6 +4,7 @@ import { caveBackground } from './cave';
 import { hiveBackground } from './hive';
 import { stormBackground } from './storm';
 import { foundryBackground } from './foundry';
+import { choirBackground } from './choir';
 import { StarField } from './common';
 import { PAL } from '../../render/palette';
 
@@ -19,6 +20,7 @@ export const BACKGROUNDS: Record<string, (w: World) => Background> = {
   hive: (w) => hiveBackground(w),
   storm: (w) => stormBackground(w),
   foundry: (w) => foundryBackground(w),
+  choir: (w) => choirBackground(w),
   space: () => {
     const s = new StarField(3);
     return { draw(g, w) { g.fillStyle = PAL.N0; g.fillRect(0, 0, 480, 270); s.draw(g, w.bgX, w.bgY, w.frame); } };

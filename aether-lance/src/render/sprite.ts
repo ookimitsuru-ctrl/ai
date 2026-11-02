@@ -124,10 +124,13 @@ export function tinted(src: Canvas, color: string): Canvas {
   return c;
 }
 
+/** Hit-flash phase: continuous hits alternate 2f white / 2f normal (docs/04 §1.1). Set by the world renderer. */
+export const flashState = { on: true };
+
 /** Draw a sprite centred at (x, y). */
 export function drawSprite(g: CanvasRenderingContext2D, s: Sprite, frame: number, x: number, y: number, flash = false): void {
   const f = ((frame % s.frames) + s.frames) % s.frames;
-  g.drawImage(flash ? s.flash : s.canvas, f * s.w, 0, s.w, s.h, Math.round(x - s.w / 2), Math.round(y - s.h / 2), s.w, s.h);
+  g.drawImage(flash && flashState.on ? s.flash : s.canvas, f * s.w, 0, s.w, s.h, Math.round(x - s.w / 2), Math.round(y - s.h / 2), s.w, s.h);
 }
 
 // ---------------------------------------------------------------------------

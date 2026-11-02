@@ -1,6 +1,6 @@
 // Draws a World into the 480×270 game canvas following the layer order of docs/07_visual.md §8.
 import { PAL, type PalKey, rgba } from './palette';
-import { drawSprite, makeCanvas, ctx2d, type Sprite } from './sprite';
+import { drawSprite, makeCanvas, ctx2d, flashState, type Sprite } from './sprite';
 import { disc, drawDisc, drawRing, stampLine, dashLine, drawGlow, lightningPts } from './draw';
 import { font, smallFont } from './font';
 import { TerrainRenderer, THEMES } from './terrainRender';
@@ -38,6 +38,7 @@ export class WorldView {
   render(g: CanvasRenderingContext2D, alpha: number, o: ViewOpts): void {
     const w = this.w;
     const a = o.interp ? alpha : 1;
+    flashState.on = ((w.frame >> 1) & 1) === 0;
     g.save();
     g.fillStyle = PAL.N0;
     g.fillRect(0, 0, 480, 270);
@@ -168,7 +169,7 @@ export class WorldView {
         g.drawImage(glow, fr * (s.w) , 0, s.w + 2, s.h + 2, Math.round(x - s.w / 2) - 1, Math.round(y - s.h / 2) - 1, s.w + 2, s.h + 2);
         g.globalAlpha = 1;
       }
-      drawSprite(g, s, fr, x, y, e.flash > 0 && (e.flash & 2) === 2 || e.flash === 1);
+      drawSprite(g, s, fr, x, y, e.flash > 0);
     } else {
       drawDisc(g, x, y, 6, e.flash ? PAL.N8 : PAL.T3);
     }

@@ -132,6 +132,9 @@ export class World {
   stats = { deaths: 0, kills: 0, itemsTotal: 0, itemsGot: 0, shots: 0, grazes: 0, bossFrames: 0, groupKills: new Map<string, number>() };
   stageData: Record<string, number> = {};
   practiceGod = false;
+  /** player position history (ECHO enemies replay it) */
+  hist = new Float32Array(2 * 512);
+  histN = 0;
 
   constructor(o: WorldOptions) {
     this.stage = o.stage;
@@ -147,6 +150,7 @@ export class World {
     this.extIdx = o.extIdx ?? 0;
     this.rankTime = 0;
     this.dark = !!o.stage.dark;
+    if (o.stage.beatBpm) this.beatLen = 3600 / o.stage.beatBpm;
     this.ctx = new Ctx(this);
     if (o.loadout) this.player.apply(o.loadout);
     this.player.drive = o.drive ?? 0;
@@ -213,6 +217,12 @@ export class World {
     return ph === 0 ? L : L - ph;
   }
   setBeatOrigin(): void { this.beatOrigin = this.frame + 1; }
+  /** Player position `back` frames ago. */
+  pastPos(back: number, out: { x: number; y: number }): void {
+    const n = Math.min(back, this.histN - 1, 511);
+    const k = (((this.histN - 1 - n) % 512) + 512) % 512 * 2;
+    out.x = this.hist[k]!; out.y = this.hist[k + 1]!;
+  }
 
   // ---------------------------------------------------------------------------------------------
   update(inp: InputFrame): void {
@@ -228,6 +238,7 @@ export class World {
     this.stepCamera();
     this.stepPhase();
     updatePlayer(this, inp);
+    { const k = (this.histN++ % 512) * 2; this.hist[k] = this.player.x; this.hist[k + 1] = this.player.y; }
     this.stepShots();
     this.stepEnemies();
     this.stepBullets();
@@ -312,7 +323,7 @@ export class World {
         this.phase = 'warning';
         this.phaseTimer = 180;
         this.music({ cmd: 'stop', fade: 1.5 });
-        this.sfx('siren');
+        if (!this.stage.beatBpm) this.sfx('siren');
         this.events.push({ type: 'warning', name: ENEMIES.get(e.id)?.bossName ?? this.stage.bossName });
         break;
       case 'bgm':
@@ -347,7 +358,7 @@ export class World {
     this.camX = this.profile.X(at);
     this.camY = this.profile.Y(at);
     this.t = at;
-    this.music({ cmd: 'play', id: bgm, fade: 0.3 });
+    if (!this.stageData.silence) this.music({ cmd: 'play', id: bgm, fade: 0.3 });
     this.musicId = bgm; this.musicStartFrame = this.frame;
     this.beatOrigin = this.frame;
     this.bgX = this.camX; this.bgY = this.camY;

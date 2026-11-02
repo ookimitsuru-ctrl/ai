@@ -365,6 +365,7 @@ export class GameScene implements Scene {
     const f = font();
     const st = save.data.settings;
     const bandH = 24;
+    if (this.world.stage.id === 6) { const vis2 = Math.min(1, k / 20, this.warnT / 20); h.globalAlpha = Math.min(1, k / 60) * vis2; f.draw(h, 'THE CHOIR', 240, 120, 'N8', 3, 'center'); h.globalAlpha = 1; void st; return; }
     const inT = Math.min(1, k / 20), outT = Math.min(1, this.warnT / 20);
     const vis = Math.min(inT, outT);
     const off = (k * 2) % 24;
