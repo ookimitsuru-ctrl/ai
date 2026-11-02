@@ -19,6 +19,8 @@ const { chromium } = require('playwright');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const PREVIEW = args.includes('--preview');
+// --from N: frames before N are simulated (for the soundtrack) but not filmed again; earlier frames on disk are reused
+const FROM = args.includes('--from') ? Number(args[args.indexOf('--from') + 1]) : 0;
 const OUT = path.resolve(root, args[args.indexOf('--out') + 1] && args.includes('--out') ? args[args.indexOf('--out') + 1] : PREVIEW ? 'pv/preview.mp4' : 'pv/aether-lance-pv.mp4');
 const W = PREVIEW ? 480 : 1920, H = PREVIEW ? 270 : 1080;
 const FPS = 60, BAR = 96, TOTAL = 25 * BAR; // 40 s
@@ -44,7 +46,7 @@ if (SHOTS.reduce((a, s) => a + s.bars, 0) * BAR !== TOTAL) throw new Error('shot
 
 const SKIP_SFX = /^(shot_|hit_|graze|enemy_fire_s|chip_tick|star|speed_|formation|menu_|pause|countdown|tally|stage_intro|siren)/;
 
-fs.rmSync(work, { recursive: true, force: true });
+if (!FROM) fs.rmSync(work, { recursive: true, force: true });
 fs.mkdirSync(work, { recursive: true });
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 
@@ -95,7 +97,7 @@ await page.evaluate(({ SKIP }) => {
 let frame = 0;
 async function shoot() {
   const file = path.join(work, String(frame).padStart(5, '0') + (PREVIEW ? '.jpg' : '.png'));
-  await page.screenshot(PREVIEW ? { path: file, type: 'jpeg', quality: 85 } : { path: file });
+  if (frame >= FROM) await page.screenshot(PREVIEW ? { path: file, type: 'jpeg', quality: 85, timeout: 180000 } : { path: file, timeout: 180000 });
   frame++;
 }
 
@@ -124,7 +126,7 @@ for (const [i, S] of SHOTS.entries()) {
     scene.debug = null;
     D.scenes.replaceNow(scene);
     window.__pvShotFrame = -1;
-    D.advance(S.warm ?? 0);
+    D.step(S.warm ?? 0);
   }, { S });
   if (S.finale) {
     // knock out THE CHOIR's first two forms (core ring, winged body) during the warm-up; stop once its last form,
@@ -139,7 +141,7 @@ for (const [i, S] of SHOTS.entries()) {
         const sil = b.parts?.find((q) => q.id === 'sil' && q.alive && !q.armored);
         if (sil && ++seen > 150) return true;
         if (!sil && k % 12 === 0) { const vul = (b.parts ?? []).find((q) => q.alive && !q.armored && q.maxHp < 1e6 && q.id !== 'sil'); if (vul) w.damageEnemy(b, vul, 99999, 0); }
-        D.advance(1);
+        D.step(1); // no drawing while fast-forwarding (queued GPU work would stall the next screenshot)
       }
       return false;
     });
@@ -149,7 +151,7 @@ for (const [i, S] of SHOTS.entries()) {
   await page.evaluate(() => { window.__dev.pv.muteSfx = false; });
   if (i === 0) await page.evaluate(() => { window.__pvPlay('st1', 0, 0); });
   for (let k = 0; k < n; k++) {
-    await page.evaluate(({ k, S, frame, TOTAL }) => {
+    await page.evaluate(({ k, S, frame, TOTAL, FROM }) => {
       const D = window.__dev;
       window.__pvT = frame / 60;
       window.__pvShotFrame = k;
@@ -159,7 +161,7 @@ for (const [i, S] of SHOTS.entries()) {
         const sil = b?.active ? b.parts?.find((q) => q.id === 'sil' && q.alive) : null;
         if (sil) w.damageEnemy(b, sil, 99999, 0);
       }
-      D.advance(1);
+      if (frame < FROM) D.step(1); else D.advance(1);
       if (frame === 12 * 96) D.audio.setDrive(true); // the B section gets the drive hats
       const ov = document.getElementById('pvfade');
       let op = 0, col = '#fff';
@@ -169,7 +171,7 @@ for (const [i, S] of SHOTS.entries()) {
         if (left <= 60) { col = '#000'; op = 1 - left / 60; }
       }
       ov.style.background = col; ov.style.opacity = String(op);
-    }, { k, S, frame, TOTAL });
+    }, { k, S, frame, TOTAL, FROM });
     await shoot();
     if (frame % 240 === 0) console.log(`frame ${frame}/${TOTAL}`);
   }

@@ -105,6 +105,8 @@ function boot(): void {
           manual(on: boolean) { manual = on; },
           /** run n fixed 60 Hz updates, then draw one frame */
           advance(n = 1) { for (let i = 0; i < n; i++) stepOnce(); renderOnce(1); },
+          /** run n updates without drawing (fast-forward) */
+          step(n = 1) { for (let i = 0; i < n; i++) stepOnce(); },
         },
       });
     }

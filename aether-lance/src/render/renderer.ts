@@ -4,6 +4,7 @@ import { makeCanvas, ctx2d, type Canvas } from './sprite';
 import { PAL, type PalKey } from './palette';
 import { input } from '../core/input';
 import { pv } from '../core/pv';
+import { HD, RS } from '../core/hd';
 
 export const GW = 480;
 export const GH = 270;
@@ -91,14 +92,14 @@ void main(){
     g.x += sin(g.y * 90.0 + time * 4.0) * 0.0018 * haze * m;
     g.y += sin(g.x * 60.0 + time * 3.0) * 0.0012 * haze * m;
   }
-  vec2 sg = soft > 0.5 ? sharp(g) : (floor(g * gsize) + 0.5) / gsize;
+  vec2 sg = soft > 1.5 ? g : soft > 0.5 ? sharp(g) : (floor(g * gsize) + 0.5) / gsize;
   vec3 col;
   if (chroma > 0.0) {
     vec2 off = vec2(chroma / gsize.x, 0.0);
     col = vec3(texture(game, sg + off).r, texture(game, sg).g, texture(game, sg - off).b);
   } else col = texture(game, sg).rgb;
   col += texture(bloom, g).rgb * bloomK;
-  vec2 hu = (floor(u * gsize) + 0.5) / gsize;
+  vec2 hu = soft > 1.5 ? u : (floor(u * gsize) + 0.5) / gsize;
   vec4 h = texture(hud, hu);
   col = mix(col, h.rgb, h.a);
   if (scan > 0.0 && scale >= 2.0) {
@@ -110,10 +111,13 @@ void main(){
 }`;
 
 export class Renderer {
-  readonly gameCanvas: Canvas = makeCanvas(GW, GH);
-  readonly hudCanvas: Canvas = makeCanvas(GW, GH);
-  readonly game = ctx2d(this.gameCanvas);
-  readonly hud = ctx2d(this.hudCanvas);
+  // HD edition: both canvases are RS× and keep a matching transform, so all drawing stays in 480×270 game units
+  gameCanvas: Canvas = makeCanvas(GW, GH);
+  hudCanvas: Canvas = makeCanvas(GW, GH);
+  game = ctx2d(this.gameCanvas);
+  hud = ctx2d(this.hudCanvas);
+  /** canvas pixels per game pixel (1 in the classic edition) */
+  rs = 1;
   private display!: HTMLCanvasElement;
   private overlayCanvas!: HTMLCanvasElement;
   overlay!: CanvasRenderingContext2D;
@@ -140,6 +144,15 @@ export class Renderer {
   glOk = false;
 
   init(root: HTMLElement): void {
+    if (HD) {
+      this.rs = RS;
+      this.gameCanvas = makeCanvas(GW * RS, GH * RS);
+      this.hudCanvas = makeCanvas(GW * RS, GH * RS);
+      this.game = ctx2d(this.gameCanvas);
+      this.hud = ctx2d(this.hudCanvas);
+      this.game.setTransform(RS, 0, 0, RS, 0, 0);
+      this.hud.setTransform(RS, 0, 0, RS, 0, 0);
+    }
     this.display = document.createElement('canvas');
     this.overlayCanvas = document.createElement('canvas');
     this.overlayCanvas.id = 'overlay';
@@ -196,10 +209,12 @@ export class Renderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         return t;
       };
-      this.texGame = tex(GW, GH, gl.NEAREST);
-      this.texHud = tex(GW, GH, gl.NEAREST);
+      const rs = this.rs;
+      this.texGame = tex(GW * rs, GH * rs, HD ? gl.LINEAR : gl.NEAREST);
+      this.texHud = tex(GW * rs, GH * rs, HD ? gl.LINEAR : gl.NEAREST);
       this.fbos = [];
-      for (const [w, h] of [[240, 135], [120, 68], [120, 68]] as const) {
+      const sizes: [number, number][] = HD ? [[Math.round(GW * rs / 4), Math.round(GH * rs / 4)], [Math.round(GW * rs / 8), Math.round(GH * rs / 8)], [Math.round(GW * rs / 8), Math.round(GH * rs / 8)]] : [[240, 135], [120, 68], [120, 68]];
+      for (const [w, h] of sizes) {
         const t = tex(w, h, gl.LINEAR);
         const fb = gl.createFramebuffer()!;
         gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
@@ -283,6 +298,10 @@ export class Renderer {
     const o = this.overlay;
     o.setTransform(1, 0, 0, 1, 0, 0);
     o.clearRect(0, 0, this.devW, this.devH);
+    if (HD) {
+      this.game.setTransform(this.rs, 0, 0, this.rs, 0, 0);
+      this.hud.setTransform(this.rs, 0, 0, this.rs, 0, 0);
+    }
     this.hud.clearRect(0, 0, GW, GH);
   }
 
@@ -305,19 +324,22 @@ export class Renderer {
       gl.bindVertexArray(this.vao);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this.texGame);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, this.settings.scaleFilter === 'soft' ? gl.LINEAR : gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, this.settings.scaleFilter === 'soft' ? gl.LINEAR : gl.NEAREST);
+      const lin = HD || this.settings.scaleFilter === 'soft';
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, lin ? gl.LINEAR : gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, lin ? gl.LINEAR : gl.NEAREST);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.gameCanvas);
       gl.bindTexture(gl.TEXTURE_2D, this.texHud);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.hudCanvas);
       const bloomOn = this.settings.bloom > 0 && !low;
       const [fBright, fA, fB] = this.fbos as [typeof this.fbos[0], typeof this.fbos[0], typeof this.fbos[0]];
       if (bloomOn) {
-        this.pass('bright', fBright, this.texGame!, (p) => gl.uniform2f(gl.getUniformLocation(p, 'texel'), 1 / GW, 1 / GH));
-        this.pass('down', fA, fBright.tex, (p) => gl.uniform2f(gl.getUniformLocation(p, 'texel'), 1 / 240, 1 / 135));
+        // HD: taps two source texels apart on the linearly filtered texture, so the 4× reduction still averages 4×4
+        const sp = HD ? 4 : 1;
+        this.pass('bright', fBright, this.texGame!, (p) => gl.uniform2f(gl.getUniformLocation(p, 'texel'), sp / (GW * this.rs), sp / (GH * this.rs)));
+        this.pass('down', fA, fBright.tex, (p) => gl.uniform2f(gl.getUniformLocation(p, 'texel'), 1 / fBright.w, 1 / fBright.h));
         for (let k = 0; k < 2; k++) {
-          this.pass('blur', fB, fA.tex, (p) => gl.uniform2f(gl.getUniformLocation(p, 'dir'), 1 / 120, 0));
-          this.pass('blur', fA, fB.tex, (p) => gl.uniform2f(gl.getUniformLocation(p, 'dir'), 0, 1 / 68));
+          this.pass('blur', fB, fA.tex, (p) => gl.uniform2f(gl.getUniformLocation(p, 'dir'), 1 / fA.w, 0));
+          this.pass('blur', fA, fB.tex, (p) => gl.uniform2f(gl.getUniformLocation(p, 'dir'), 0, 1 / fA.h));
         }
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -331,7 +353,7 @@ export class Renderer {
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texGame); gl.uniform1i(U('game'), 0);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.texHud); gl.uniform1i(U('hud'), 1);
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, fA.tex); gl.uniform1i(U('bloom'), 2);
-      gl.uniform2f(U('gsize'), GW, GH);
+      gl.uniform2f(U('gsize'), GW * this.rs, GH * this.rs);
       gl.uniform1f(U('scale'), this.vp.scale);
       gl.uniform1f(U('bloomK'), bloomOn ? (this.settings.bloom / 100) * 1.1 : 0);
       const crt = this.settings.crt;
@@ -339,7 +361,7 @@ export class Renderer {
       gl.uniform1f(U('vig'), crt === 'off' ? 0 : crt === 'strong' ? 0.28 : 0.15);
       gl.uniform1f(U('curve'), crt === 'strong' ? 0.035 : 0);
       gl.uniform1f(U('chroma'), this.chroma);
-      gl.uniform1f(U('soft'), this.settings.scaleFilter === 'soft' ? 1 : 0);
+      gl.uniform1f(U('soft'), HD ? 2 : this.settings.scaleFilter === 'soft' ? 1 : 0);
       gl.uniform1f(U('haze'), this.haze);
       gl.uniform1f(U('time'), this.time);
       this.waveData.fill(0);
@@ -353,11 +375,11 @@ export class Renderer {
     } else {
       if (!this.d2) return;
       const g = this.d2;
-      g.imageSmoothingEnabled = this.settings.scaleFilter === 'soft';
+      g.imageSmoothingEnabled = HD || this.settings.scaleFilter === 'soft';
       g.fillStyle = '#000';
       g.fillRect(0, 0, this.devW, this.devH);
       g.drawImage(this.gameCanvas, this.vp.x, this.vp.y, this.vp.w, this.vp.h);
-      g.imageSmoothingEnabled = false;
+      g.imageSmoothingEnabled = HD;
       g.drawImage(this.hudCanvas, this.vp.x, this.vp.y, this.vp.w, this.vp.h);
     }
   }

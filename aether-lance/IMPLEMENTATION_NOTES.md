@@ -96,3 +96,19 @@ Twelve shots cut on bar lines (150 BPM, 96 frames per bar), with the drive-layer
   is shown in the ending, but there is no separate stats / achievements screen.
 - The SHOULD "survival bot" that searches for unavoidable bullet situations (10 §3) is covered only partially: the autopilot
   clears all stages and defeats every boss, but there is no automated "no escape" detector.
+
+## HD edition (in progress — resume from here)
+
+Goal (user request): a separate high-quality edition with modern, smoothly shaded characters and backgrounds,
+shipped as its own APK. Same game logic and content; only rendering changes. Build-time switch `__HD__`
+(`AL_EDITION=hd`), `src/core/hd.ts` (`HD`, `RS` = render scale 3, `snap`, `blit`, logical canvas size `k`).
+Done so far:
+- `src/render/spriteHD.ts`: SB primitives are recorded (`SB.ops`) and re-rasterised at RS×2 with continuous ramp
+  shading, Blinn-Phong gloss, rim light, AA outline, 2×2 downsample. `Sprite.k`, `drawSprite` uses logical size,
+  `glow/drawGlow`, `flipX/Y`, `rotations` (smooth), `frameCanvas`, pixel-string sprites (`upscalePixelArt`).
+- `src/render/draw.ts`: smooth disc / ring / stroke / dashed line / glow in HD.
+- `src/render/renderer.ts`: game + HUD canvases at RS× with a transform, linear sampling, bloom chain sized for HD.
+To do: build scripts (`build:hd`, `build:single:hd`), terrain HD painting, background layers at RS× (`layerCanvas`,
+`blit`, continuous `rampPick`/`paintCanvas`), star field, HD world effects (shots, flame, particles, breakables,
+dynamic walls, hazards), vector HUD/menu text, logo, title planet, default settings (CRT off, FIT, soft),
+Android product flavours (classic / hd, applicationId `com.aetherlance.game.hd`), CI + docs, screenshots review.

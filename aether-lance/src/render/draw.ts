@@ -1,5 +1,6 @@
 // Low-level pixel drawing helpers (cached discs/rings, stamped lines).
 import { makeCanvas, ctx2d, type Canvas } from './sprite';
+import { HD, RS } from '../core/hd';
 
 const discCache = new Map<string, Canvas>();
 export function disc(r: number, color: string): Canvas {
@@ -20,12 +21,22 @@ export function disc(r: number, color: string): Canvas {
 }
 
 export function drawDisc(g: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
+  if (HD) {
+    g.fillStyle = color;
+    g.beginPath(); g.arc(x, y, Math.max(0.5, r + 0.3), 0, Math.PI * 2); g.fill();
+    return;
+  }
   const c = disc(r, color);
   g.drawImage(c, Math.round(x) - (c.width >> 1), Math.round(y) - (c.height >> 1));
 }
 
 const ringCache = new Map<string, Canvas>();
 export function drawRing(g: CanvasRenderingContext2D, x: number, y: number, r: number, color: string, width = 1): void {
+  if (HD) {
+    g.strokeStyle = color; g.lineWidth = width;
+    g.beginPath(); g.arc(x, y, Math.max(0.5, r - width / 2 + 0.5), 0, Math.PI * 2); g.stroke();
+    return;
+  }
   const rr = Math.max(1, Math.round(r));
   const key = rr + '|' + width + color;
   let c = ringCache.get(key);
@@ -46,6 +57,13 @@ export function drawRing(g: CanvasRenderingContext2D, x: number, y: number, r: n
 
 /** Pixel line made of w×w stamps (crisp at low resolution). */
 export function stampLine(g: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, w: number): void {
+  if (HD) {
+    // smooth round-capped stroke in the current fill colour
+    g.strokeStyle = g.fillStyle; g.lineWidth = w; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+    g.lineCap = 'butt';
+    return;
+  }
   const dx = x2 - x1, dy = y2 - y1;
   const n = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy))));
   const h = w / 2;
@@ -56,6 +74,13 @@ export function stampLine(g: CanvasRenderingContext2D, x1: number, y1: number, x
 
 /** Dashed pixel line (telegraphs). */
 export function dashLine(g: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, dash: number, offset: number, w = 1): void {
+  if (HD) {
+    g.strokeStyle = g.fillStyle; g.lineWidth = w * 0.8; g.lineCap = 'round';
+    g.setLineDash([dash * 0.6, dash * 1.4]); g.lineDashOffset = -offset;
+    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+    g.setLineDash([]); g.lineCap = 'butt';
+    return;
+  }
   const dx = x2 - x1, dy = y2 - y1;
   const len = Math.sqrt(dx * dx + dy * dy);
   const n = Math.ceil(len);
@@ -73,23 +98,40 @@ export function glowSprite(r: number, color: string): Canvas {
   const key = rr + color;
   let c = glowCache.get(key);
   if (!c) {
-    c = makeCanvas(rr * 2, rr * 2);
+    if (glowCache.size > 400) glowCache.clear();
+    const k = HD ? RS : 1;
+    c = makeCanvas(rr * 2 * k, rr * 2 * k);
     const g = ctx2d(c);
-    const grd = g.createRadialGradient(rr, rr, 0, rr, rr, rr);
+    const R = rr * k;
+    const grd = g.createRadialGradient(R, R, 0, R, R, R);
     grd.addColorStop(0, color);
+    if (HD) { grd.addColorStop(0.25, color); grd.addColorStop(0.5, fade(color, 0.35)); grd.addColorStop(0.75, fade(color, 0.1)); }
     grd.addColorStop(1, 'rgba(0,0,0,0)');
     g.fillStyle = grd;
-    g.fillRect(0, 0, rr * 2, rr * 2);
+    g.fillRect(0, 0, R * 2, R * 2);
     glowCache.set(key, c);
   }
   return c;
+}
+
+/** Same colour at a lower alpha (accepts #rrggbb, rgb(), rgba() and hsl()). */
+function fade(color: string, a: number): string {
+  if (color.startsWith('#') && color.length === 7) {
+    const v = parseInt(color.slice(1), 16);
+    return `rgba(${(v >> 16) & 255},${(v >> 8) & 255},${v & 255},${a})`;
+  }
+  const m = color.match(/^(rgb|hsl)a?\(([^)]+)\)$/);
+  if (m) { const parts = m[2]!.split(',').slice(0, 3).join(','); return `${m[1]}a(${parts},${a})`; }
+  return color;
 }
 
 export function drawGlow(g: CanvasRenderingContext2D, x: number, y: number, r: number, color: string, alpha = 1): void {
   const c = glowSprite(r, color);
   const a = g.globalAlpha;
   g.globalAlpha = a * alpha;
-  g.drawImage(c, Math.round(x - c.width / 2), Math.round(y - c.height / 2));
+  const rr = Math.max(2, Math.round(r));
+  if (HD) g.drawImage(c, x - rr, y - rr, rr * 2, rr * 2);
+  else g.drawImage(c, Math.round(x - c.width / 2), Math.round(y - c.height / 2));
   g.globalAlpha = a;
 }
 

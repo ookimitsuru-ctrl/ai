@@ -165,8 +165,7 @@ export class WorldView {
       if (e.carrier && !e.dead) {
         const pulse = 0.55 + 0.45 * Math.sin(this.w.frame * 0.21);
         g.globalAlpha = pulse;
-        const glow = s.glow(carrierColor(e.carrier));
-        g.drawImage(glow, fr * (s.w) , 0, s.w + 2, s.h + 2, Math.round(x - s.w / 2) - 1, Math.round(y - s.h / 2) - 1, s.w + 2, s.h + 2);
+        s.drawGlow(g, carrierColor(e.carrier), fr, x, y);
         g.globalAlpha = 1;
       }
       drawSprite(g, s, fr, x, y, e.flash > 0);

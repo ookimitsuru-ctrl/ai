@@ -17,8 +17,7 @@ export function drawCarrierGlow(g: CanvasRenderingContext2D, e: Enemy, sprName: 
   if (flip) s = s.flipY;
   if (e.carrier) {
     g.globalAlpha = 0.55 + 0.45 * Math.sin(e.age * 0.21);
-    const gl = s.glow(carrierColor(e.carrier));
-    g.drawImage(gl, (fr % s.frames) * s.w, 0, s.w + 2, s.h + 2, Math.round(x - s.w / 2) - 1, Math.round(y - s.h / 2) - 1, s.w + 2, s.h + 2);
+    s.drawGlow(g, carrierColor(e.carrier), fr, x, y);
     g.globalAlpha = 1;
   }
   drawSprite(g, s, fr, x, y, e.flash > 0);
@@ -329,7 +328,7 @@ function debrisDef(id: string, hp: number, score: number, r: number, child: stri
       const s = rots[i]!;
       if (e.carrier) {
         g.globalAlpha = 0.55 + 0.45 * Math.sin(e.age * 0.21);
-        g.drawImage(s.glow(carrierColor(e.carrier)), Math.round(x - s.w / 2) - 1, Math.round(y - s.h / 2) - 1);
+        s.drawGlow(g, carrierColor(e.carrier), 0, x, y);
         g.globalAlpha = 1;
       }
       drawSprite(g, s, 0, x, y, e.flash > 0);

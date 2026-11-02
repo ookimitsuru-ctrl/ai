@@ -29,8 +29,8 @@ export function drawHud(g: CanvasRenderingContext2D, w: World, hi: number, label
   f.draw(g, label, 476, 2, 'N6', 1, 'right');
   // bottom: lives
   const lives = Math.max(0, w.lives);
-  if (lives <= 4) for (let i = 0; i < lives; i++) g.drawImage(shipIcon.canvas, 4 + i * 11, 260);
-  else { g.drawImage(shipIcon.canvas, 4, 260); f.draw(g, '×' + lives, 15, 259, 'N8'); }
+  if (lives <= 4) for (let i = 0; i < lives; i++) g.drawImage(shipIcon.canvas, 4 + i * 11, 260, shipIcon.w, shipIcon.h);
+  else { g.drawImage(shipIcon.canvas, 4, 260, shipIcon.w, shipIcon.h); f.draw(g, '×' + lives, 15, 259, 'N8'); }
   // speed
   if (!p.touch) {
     f.draw(g, 'SPD', 52, 259, 'N6');

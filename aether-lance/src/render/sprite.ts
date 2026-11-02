@@ -1,6 +1,8 @@
 // Sprites: pixel-string definitions, an auto-shading "sprite builder", and pre-baked variants
 // (hit-flash silhouette, carrier glow, vertical flip, pre-rotated frames).
 import { PAL, type PalKey, hexToRgb, bayer } from './palette';
+import { HD, RS, snap, type ScaledCanvas } from '../core/hd';
+import { renderSpriteHD, upscalePixelArt, type SBOp } from './spriteHD';
 
 export type Canvas = HTMLCanvasElement;
 
@@ -13,8 +15,19 @@ export function makeCanvas(w: number, h: number): Canvas {
 
 export function ctx2d(c: Canvas): CanvasRenderingContext2D {
   const g = c.getContext('2d', { willReadFrequently: false })!;
-  g.imageSmoothingEnabled = false;
+  g.imageSmoothingEnabled = HD;
+  if (HD) g.imageSmoothingQuality = 'high';
   return g;
+}
+
+/** HD: an art canvas of logical size w×h stored at RS× (drawing code keeps using game-pixel coordinates). */
+export function layerCanvas(w: number, h: number): { c: ScaledCanvas; g: CanvasRenderingContext2D } {
+  const k = HD ? RS : 1;
+  const c = makeCanvas(Math.ceil(w * k), Math.ceil(h * k)) as ScaledCanvas;
+  c.k = k;
+  const g = ctx2d(c);
+  if (k !== 1) g.setTransform(k, 0, 0, k, 0, 0);
+  return { c, g };
 }
 
 export class Sprite {
@@ -22,26 +35,30 @@ export class Sprite {
   readonly h: number;
   readonly frames: number;
   readonly canvas: Canvas;
+  /** canvas pixels per game pixel (RS for HD-built art, 1 for classic) */
+  readonly k: number;
   private _flash: Canvas | null = null;
   private _flipY: Sprite | null = null;
   private _flipX: Sprite | null = null;
   private _glow = new Map<string, Canvas>();
   private _rot = new Map<number, Sprite[]>();
 
-  constructor(canvas: Canvas, w: number, h: number, frames: number) {
+  constructor(canvas: Canvas, w: number, h: number, frames: number, k = 1) {
     this.canvas = canvas;
     this.w = w;
     this.h = h;
     this.frames = frames;
+    this.k = k;
   }
 
   static fromCanvases(list: Canvas[]): Sprite {
+    const k = (list[0] as ScaledCanvas | undefined)?.k ?? 1;
     const w = Math.max(...list.map((c) => c.width));
     const h = Math.max(...list.map((c) => c.height));
     const strip = makeCanvas(w * list.length, h);
     const g = ctx2d(strip);
     list.forEach((c, i) => g.drawImage(c, i * w + ((w - c.width) >> 1), (h - c.height) >> 1));
-    return new Sprite(strip, w, h, list.length);
+    return new Sprite(strip, w / k, h / k, list.length, k);
   }
 
   get flash(): Canvas {
@@ -49,18 +66,37 @@ export class Sprite {
     return this._flash;
   }
 
+  /** Halo around the silhouette (carrier glow): 1 px ring in classic, a soft blurred aura in HD. Size (w+2)×(h+2) per frame. */
   glow(color: string): Canvas {
     let c = this._glow.get(color);
     if (!c) {
-      c = makeCanvas(this.canvas.width + 2, this.canvas.height + 2);
+      const k = this.k;
+      c = makeCanvas(this.canvas.width + 2 * k * this.frames, this.canvas.height + 2 * k);
       const g = ctx2d(c);
       const t = tinted(this.canvas, color);
-      for (const [dx, dy] of [[0, 1], [2, 1], [1, 0], [1, 2], [0, 0], [2, 2], [0, 2], [2, 0]] as const) g.drawImage(t, dx, dy);
-      g.globalCompositeOperation = 'destination-out';
-      g.drawImage(this.canvas, 1, 1);
+      if (k === 1) {
+        for (let f = 0; f < this.frames; f++) {
+          for (const [dx, dy] of [[0, 1], [2, 1], [1, 0], [1, 2], [0, 0], [2, 2], [0, 2], [2, 0]] as const) g.drawImage(t, f * this.w, 0, this.w, this.h, f * (this.w + 2) + dx, dy, this.w, this.h);
+        }
+        g.globalCompositeOperation = 'destination-out';
+        for (let f = 0; f < this.frames; f++) g.drawImage(this.canvas, f * this.w, 0, this.w, this.h, f * (this.w + 2) + 1, 1, this.w, this.h);
+      } else {
+        const fw = this.w * k, fh = this.h * k;
+        g.filter = `blur(${k * 1.2}px)`;
+        for (let f = 0; f < this.frames; f++) for (let r = 0; r < 2; r++) g.drawImage(t, f * fw, 0, fw, fh, f * (fw + 2 * k) + k, k, fw, fh);
+        g.filter = 'none';
+        g.globalCompositeOperation = 'destination-out';
+        for (let f = 0; f < this.frames; f++) g.drawImage(this.canvas, f * fw, 0, fw, fh, f * (fw + 2 * k) + k, k, fw, fh);
+      }
       this._glow.set(color, c);
     }
     return c;
+  }
+
+  /** Draw the glow() halo for a frame, centred like drawSprite. */
+  drawGlow(g: CanvasRenderingContext2D, color: string, frame: number, x: number, y: number): void {
+    const k = this.k, f = ((frame % this.frames) + this.frames) % this.frames;
+    g.drawImage(this.glow(color), f * (this.w + 2) * k, 0, (this.w + 2) * k, (this.h + 2) * k, snap(x - this.w / 2 - 1), snap(y - this.h / 2 - 1), this.w + 2, this.h + 2);
   }
 
   get flipY(): Sprite {
@@ -70,7 +106,7 @@ export class Sprite {
       g.translate(0, c.height);
       g.scale(1, -1);
       g.drawImage(this.canvas, 0, 0);
-      this._flipY = new Sprite(c, this.w, this.h, this.frames);
+      this._flipY = new Sprite(c, this.w, this.h, this.frames, this.k);
     }
     return this._flipY;
   }
@@ -78,12 +114,14 @@ export class Sprite {
   get flipX(): Sprite {
     if (!this._flipX) {
       const parts: Canvas[] = [];
+      const fw = this.w * this.k, fh = this.h * this.k;
       for (let i = 0; i < this.frames; i++) {
-        const c = makeCanvas(this.w, this.h);
+        const c = makeCanvas(fw, fh) as ScaledCanvas;
+        c.k = this.k;
         const g = ctx2d(c);
-        g.translate(this.w, 0);
+        g.translate(fw, 0);
         g.scale(-1, 1);
-        g.drawImage(this.canvas, i * this.w, 0, this.w, this.h, 0, 0, this.w, this.h);
+        g.drawImage(this.canvas, i * fw, 0, fw, fh, 0, 0, fw, fh);
         parts.push(c);
       }
       this._flipX = Sprite.fromCanvases(parts);
@@ -95,12 +133,24 @@ export class Sprite {
   rotations(n: number, frame = 0): Sprite[] {
     let r = this._rot.get(n * 100 + frame);
     if (!r) {
-      const src = makeCanvas(this.w, this.h);
-      ctx2d(src).drawImage(this.canvas, frame * this.w, 0, this.w, this.h, 0, 0, this.w, this.h);
+      const src = this.frameCanvas(frame);
       r = [];
       for (let k = 0; k < n; k++) {
-        const c = rotSprite(src, (k * 360) / n);
-        r.push(new Sprite(c, c.width, c.height, 1));
+        if (this.k === 1) {
+          const c = rotSprite(src, (k * 360) / n);
+          r.push(new Sprite(c, c.width, c.height, 1));
+        } else {
+          // HD: smooth rotation of the hi-res frame
+          const deg = (k * 360) / n, rad = (deg * Math.PI) / 180;
+          const cs = Math.abs(Math.cos(rad)), sn = Math.abs(Math.sin(rad));
+          const lw0 = Math.ceil(this.w * cs + this.h * sn) + 2, lh0 = Math.ceil(this.w * sn + this.h * cs) + 2;
+          const c = makeCanvas(lw0 * this.k, lh0 * this.k);
+          const g = ctx2d(c);
+          g.translate(c.width / 2, c.height / 2);
+          g.rotate(rad);
+          g.drawImage(src, -src.width / 2, -src.height / 2);
+          r.push(new Sprite(c, lw0, lh0, 1, this.k));
+        }
       }
       this._rot.set(n * 100 + frame, r);
     }
@@ -108,14 +158,17 @@ export class Sprite {
   }
 
   frameCanvas(frame: number): Canvas {
-    const c = makeCanvas(this.w, this.h);
-    ctx2d(c).drawImage(this.canvas, frame * this.w, 0, this.w, this.h, 0, 0, this.w, this.h);
+    const fw = this.w * this.k, fh = this.h * this.k;
+    const c = makeCanvas(fw, fh) as ScaledCanvas;
+    c.k = this.k;
+    ctx2d(c).drawImage(this.canvas, frame * fw, 0, fw, fh, 0, 0, fw, fh);
     return c;
   }
 }
 
 export function tinted(src: Canvas, color: string): Canvas {
-  const c = makeCanvas(src.width, src.height);
+  const c = makeCanvas(src.width, src.height) as ScaledCanvas;
+  c.k = (src as ScaledCanvas).k;
   const g = ctx2d(c);
   g.drawImage(src, 0, 0);
   g.globalCompositeOperation = 'source-in';
@@ -130,7 +183,8 @@ export const flashState = { on: true };
 /** Draw a sprite centred at (x, y). */
 export function drawSprite(g: CanvasRenderingContext2D, s: Sprite, frame: number, x: number, y: number, flash = false): void {
   const f = ((frame % s.frames) + s.frames) % s.frames;
-  g.drawImage(flash && flashState.on ? s.flash : s.canvas, f * s.w, 0, s.w, s.h, Math.round(x - s.w / 2), Math.round(y - s.h / 2), s.w, s.h);
+  const k = s.k;
+  g.drawImage(flash && flashState.on ? s.flash : s.canvas, f * s.w * k, 0, s.w * k, s.h * k, snap(x - s.w / 2), snap(y - s.h / 2), s.w, s.h);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +215,7 @@ export function fromStrings(def: StringSpriteDef): Sprite {
       }
     }
     g.putImageData(img, 0, 0);
-    list.push(c);
+    list.push(HD ? upscalePixelArt(c) : c);
   }
   return Sprite.fromCanvases(list);
 }
@@ -187,6 +241,8 @@ export class SB {
   readonly m: Uint8Array;
   readonly ov: Int32Array;
   private mats: Material[] = [{ ramp: ['N0'] }];
+  /** primitives, replayed at high resolution by the HD edition */
+  readonly ops: SBOp[] = [];
 
   constructor(w: number, h: number) {
     this.w = w; this.h = h;
@@ -208,11 +264,13 @@ export class SB {
   }
 
   rect(x: number, y: number, w: number, h: number, id: number): this {
+    if (HD) { this.ops.push({ k: 'rect', x, y, w, h, id }); return this; }
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.set(x + i, y + j, id);
     return this;
   }
 
   ellipse(cx: number, cy: number, rx: number, ry: number, id: number): this {
+    if (HD) { this.ops.push({ k: 'ellipse', cx, cy, rx, ry, id }); return this; }
     const x0 = Math.floor(cx - rx - 1), x1 = Math.ceil(cx + rx + 1), y0 = Math.floor(cy - ry - 1), y1 = Math.ceil(cy + ry + 1);
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry;
@@ -226,6 +284,7 @@ export class SB {
   }
 
   ring(cx: number, cy: number, r0: number, r1: number, id: number): this {
+    if (HD) { this.ops.push({ k: 'ring', cx, cy, r0, r1, id }); return this; }
     for (let y = Math.floor(cy - r1 - 1); y <= cy + r1 + 1; y++) for (let x = Math.floor(cx - r1 - 1); x <= cx + r1 + 1; x++) {
       const dx = x + 0.5 - cx, dy = y + 0.5 - cy, d = Math.sqrt(dx * dx + dy * dy);
       if (d >= r0 && d <= r1) this.set(x, y, id);
@@ -235,6 +294,7 @@ export class SB {
 
   /** Filled polygon from flat [x0,y0,x1,y1,...] (pixel-centre sampling, even-odd). */
   poly(pts: number[], id: number): this {
+    if (HD) { this.ops.push({ k: 'poly', pts: pts.slice(), id }); return this; }
     const n = pts.length / 2;
     let minY = Infinity, maxY = -Infinity;
     for (let i = 0; i < n; i++) { minY = Math.min(minY, pts[i * 2 + 1]!); maxY = Math.max(maxY, pts[i * 2 + 1]!); }
@@ -255,6 +315,7 @@ export class SB {
   }
 
   line(x0: number, y0: number, x1: number, y1: number, id: number, thick = 1): this {
+    if (HD) { this.ops.push({ k: 'line', x0, y0, x1, y1, id, thick }); return this; }
     x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
     const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
     let err = dx + dy;
@@ -275,6 +336,7 @@ export class SB {
     if (x < 0 || y < 0 || x >= this.w || y >= this.h) return this;
     const i = y * this.w + x;
     const hex = key.startsWith('#') ? key : PAL[key as PalKey];
+    if (HD) { this.ops.push({ k: 'px', x, y, rgb: parseInt(hex.slice(1), 16) }); return this; }
     this.ov[i] = parseInt(hex.slice(1), 16);
     if (this.m[i] === 0) this.m[i] = 255;
     return this;
@@ -293,6 +355,7 @@ export class SB {
 
   /** Mirror the top half onto the bottom half (vertical symmetry). */
   mirrorY(): this {
+    if (HD) { this.ops.push({ k: 'mirrorY' }); return this; }
     const { w, h } = this;
     for (let y = 0; y < h >> 1; y++) for (let x = 0; x < w; x++) {
       const a = y * w + x, b = (h - 1 - y) * w + x;
@@ -302,6 +365,7 @@ export class SB {
   }
 
   mirrorX(): this {
+    if (HD) { this.ops.push({ k: 'mirrorX' }); return this; }
     const { w, h } = this;
     for (let y = 0; y < h; y++) for (let x = 0; x < w >> 1; x++) {
       const a = y * w + x, b = y * w + (w - 1 - x);
@@ -311,6 +375,7 @@ export class SB {
   }
 
   render(opts: { outline?: PalKey | 'auto' | null } = {}): Canvas {
+    if (HD) return renderSpriteHD(this.w, this.h, this.ops, this.mats, opts.outline === undefined ? 'N1' : opts.outline);
     const { w, h, m } = this;
     const N = w * h;
     // region distance (to empty or different material), chamfer 1/1.414
