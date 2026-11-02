@@ -27,6 +27,18 @@ interface Ctx {
   spd: number;
 }
 
+const TERRAIN_AHEAD = [40, 60, 90];
+
+/** Terrain kill box overlap at (x, y) k frames from now. */
+function terrainAt(w: World, x: number, y: number, k: number): boolean {
+  const [cx, cy] = camAt(w, k);
+  const ox = w.camX, oy = w.camY;
+  w.camX = cx; w.camY = cy;
+  const hit = !!terrainHit(w, x, y);
+  w.camX = ox; w.camY = oy;
+  return hit;
+}
+
 function camAt(w: World, k: number): [number, number] {
   if (w.waiting) return [w.camX, w.camY];
   return [w.profile.X(w.t + k), w.profile.Y(w.t + k)];
@@ -44,7 +56,7 @@ function danger(c: Ctx, x: number, y: number, k: number): number {
     if (terrainHit(w, x, y)) cost += HIT;
     else if (terrainHit(w, x, y - 4) || terrainHit(w, x, y + 4) || terrainHit(w, x + 5, y) || terrainHit(w, x - 4, y)) cost += 400;
     w.camX = ox; w.camY = oy;
-    if (x <= PLAYER.bounds.x0 + 2) cost += 200; // pinned to the left edge: no room to escape a wall
+    if (x < PLAYER.bounds.x0 + 30) cost += (PLAYER.bounds.x0 + 30 - x) * 10; // near the left edge: no room to escape a wall
   }
   const hx = x + PLAYER.hitOffsetX, hy = y, hr = PLAYER.hitR;
   for (const b of c.bullets) {
@@ -178,6 +190,9 @@ export function plannerInput(w: World): InputFrame {
       let c2 = 0, pk = prevK, x2 = x, y2 = y;
       for (const k of SEG2) { [x2, y2] = step(x2, y2, DIRS[j]!, k - pk); pk = k; c2 += danger(c, x2, y2, k) * (k < 16 ? 1 : 0.6); if (c2 + c1 >= bestCost) break; }
       c2 += Math.abs(x2 - pref.x) * 0.6 + Math.abs(y2 - pref.y) * 1.2;
+      // longer look at the terrain only: would holding this spot run into a wall in the next ~1.5 s? (hanging
+      // pillars in stage 1 have to be passed underneath well before they arrive, or the ship gets pinned left)
+      if (w.cfg.terrainKills) for (const k of TERRAIN_AHEAD) if (terrainAt(w, x2, y2, k)) { c2 += 700; break; }
       if (c2 < best2) best2 = c2;
     }
     const total = c1 + best2 + (i === lastDir ? -2 : 0);
