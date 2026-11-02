@@ -89,4 +89,29 @@ export const st4: SongDef = {
   drive: ['drive'],
 };
 
+// ---- STAGE 5: Iron Foundry (G minor, 144, industrial) ----
+const A5 = ['Gm', 'Gm', 'Eb', 'F', 'Gm', 'Gm', 'Eb', 'F'];
+const B5 = ['Cm', 'D7', 'Gm', 'D7', 'Cm', 'D7', 'Gm', 'Gm'];
+const R5: Record<string, [string, number]> = { Gm: ['g', 1], Eb: ['e-', 1], F: ['f', 1], Cm: ['c', 2], D7: ['d', 2] };
+const ind = '{c f+}8 {a f+}8 {d c f+}8 {a f+}8 {c f+}8 {a f+}8 {d c f+}8 {a f+}16 a16';
+const indFill = '{c f+}8 {a f+}8 {d c f+}8 {a f+}8 d16 a16 d16 a16 e16 e16 {b c}8';
+export const st5: SongDef = {
+  id: 'st5', title: 'Iron Foundry', bpm: 144,
+  tracks: {
+    lead: `t144 @brass v12 q6 l8
+      r1 r1 r1 r1
+      L
+      o5 g4 g8 b-8 a4 g8 f8 | o5 g2 d4 f4 | o5 e-4 g8 b-8 o6 c4 o5 b-8 a8 | o5 a2. r4 |
+      o5 g4 g8 b-8 o6 d4 c8 o5 b-8 | o5 b-4 a8 g8 d4 g8 a8 | o5 b-4. o6 c8 e-4 d8 c8 | o6 c2 o5 a4 f4 |
+      @lead_saw q7 o6 c4. e-8 g4 f8 e-8 | o6 d4. f+8 a4 g8 f+8 | o6 g2 f8 e-8 d8 c8 | o5 a2. r4 |
+      o6 e-4 g8 e-8 c4 e-8 g8 | o6 f+4 a8 f+8 d4 f+8 a8 | o6 b-4. a8 g4 d8 b-8 | o6 g2. r4 @brass q6 |`,
+    arp: `@arp v7 ${rep(arpC('Gm', 4), 2)} ${arpC('Eb', 4)} ${arpC('F', 4)} L ${[...A5, ...B5].map((c) => arpC(c, 4)).join(' ')}`,
+    pad: `@strings v7 ${padC('Gm')} ${padC('Gm')} ${padC('Eb')} ${padC('F')} L ${[...A5, ...B5].map((c) => padC(c)).join(' ')}`,
+    bass: `@bass_dist v12 q5 ${['g', 'g', 'e-', 'f'].map((r) => bass8(r, 1)).join(' ')} L ${[...A5, ...B5].map((c) => bass8(R5[c]![0], R5[c]![1])).join(' ')}`,
+    drums: `@drums v12 ${rep(ind, 3)} ${indFill} L ${rep(ind, 7)} ${indFill} ${rep(ind, 7)} ${indFill}`,
+    drive: `@drums v8 r1 r1 r1 r1 L ${rep('a16 a16 c+16 a16 a16 a16 c+16 a16 a16 a16 c+16 a16 a16 c+16 c+16 a16', 16)}`,
+  },
+  drive: ['drive'],
+};
+
 export const _cs = { CH, bass8 };

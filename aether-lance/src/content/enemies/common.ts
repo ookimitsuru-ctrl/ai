@@ -87,6 +87,16 @@ defEnemy({
       const up = e.y > 135 ? 1 : -1;
       for (;;) { e.x -= 1.2; e.y += up * 2.5; yield; }
     },
+    *fall(e, c) {
+      const bx = e.x, sp = e.v.speed ?? 2.0;
+      let fired = false;
+      for (;;) {
+        e.y += sp;
+        e.x = bx + 30 * dsin(e.age * 4 + (e.v.phase ?? 0));
+        if (!fired && c.fires() && e.y > 60) fired = c.aimed(2.0);
+        yield;
+      }
+    },
     *behind(e, c) {
       const sp = e.v.speed ?? 2.6;
       for (;;) { e.x += sp; if (e.x > 470 && c.fires()) { c.aimed(2.0); e.fireMask = 0; } yield; }

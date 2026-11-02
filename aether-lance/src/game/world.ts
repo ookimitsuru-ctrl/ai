@@ -1012,10 +1012,11 @@ export class World {
         it.y = clamp(it.y, 20, 250);
         if (--it.life <= 0) it.active = false;
       } else {
-        const drift = -Math.max(0.35, Math.min(1.2, this.waiting ? 0.4 : Math.abs(this.scrollVX)));
+        const vert = !this.waiting && Math.abs(this.scrollVY) > 0.1 && Math.abs(this.scrollVX) < 0.2;
+        const drift = vert ? 0 : -Math.max(0.35, Math.min(1.2, this.waiting ? 0.4 : Math.abs(this.scrollVX)));
         it.vx += (drift - it.vx) * 0.05;
         it.x += it.vx;
-        it.baseY += this.scrollVY * -0.5;
+        if (!this.waiting) it.baseY -= this.scrollVY;
         it.y = clamp(it.baseY + dsin(it.age * 6) * 3, 20, 250);
       }
       if (it.x < -16) it.active = false;
