@@ -20,6 +20,8 @@ html = html.replace(/<link rel="(icon|apple-touch-icon)"[^>]*>/g, '');
 html = html.replace('<meta charset="utf-8" />', '<meta charset="utf-8" />\n  <meta name="singlefile" content="1" />');
 // inline the SVG icon as a data URI favicon
 try { const svg = fs.readFileSync(path.join(srcDir, 'icon.svg'), 'utf8'); html = html.replace('</title>', '</title>\n  <link rel="icon" href="data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64') + '" />'); } catch { /* no icon */ }
+// the embedded font's license travels inside the single file
+try { const ofl = fs.readFileSync(path.join(srcDir, 'licenses/DotGothic16-OFL.txt'), 'utf8').replace(/--/g, '- -'); html = html.replace('</html>', `<!--\n${ofl}\n-->\n</html>`); } catch { /* no license file */ }
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 fs.writeFileSync(outFile, html);
 fs.rmSync(srcDir, { recursive: true, force: true });

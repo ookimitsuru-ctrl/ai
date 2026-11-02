@@ -205,6 +205,55 @@ await scenario('single-file build runs from file://', async (page) => {
   if (!(await canvasNotBlack(page))) throw new Error('canvas black');
 });
 
+await scenario('android shell: app-assets origin, offline, back button', async (page) => {
+  // Mirrors the APK: the single file is served from https://appassets.androidplatform.net/ and nothing else is reachable.
+  const html = fs.readFileSync(path.join(root, 'dist-single/aether-lance.html'));
+  const blocked = [];
+  await page.route('**/*', (route) => {
+    const u = new URL(route.request().url());
+    if (u.hostname === 'appassets.androidplatform.net' && u.pathname === '/index.html') return route.fulfill({ status: 200, contentType: 'text/html', body: html });
+    blocked.push(u.href.slice(0, 80));
+    return route.abort();
+  });
+  const back = () => page.evaluate(() => window.AetherLance.back());
+  await page.goto('https://appassets.androidplatform.net/index.html?debug=1');
+  await waitFor(page, (v) => v.name === 'BootScene', 10000);
+  if (await back()) throw new Error('back on the boot screen should leave the app');
+  await page.waitForTimeout(600);
+  await page.touchscreen.tap(400, 200);
+  await waitFor(page, (v) => v.name === 'TitleScene');
+  if (await back()) throw new Error('back on the title should leave the app');
+  const font = await page.evaluate(() => document.fonts.check('16px "DotGothic16"', 'エーテル'));
+  if (!font) throw new Error('bundled font not loaded');
+  await page.waitForTimeout(900);
+  await press(page, 'Enter');
+  await waitFor(page, (v) => v.name === 'MainMenuScene');
+  await page.waitForTimeout(400);
+  if (!(await back())) throw new Error('back in the menu should be handled');
+  await waitFor(page, (v) => v.name === 'TitleScene');
+  await page.waitForTimeout(900);
+  await press(page, 'Enter');
+  await waitFor(page, (v) => v.name === 'MainMenuScene');
+  await page.waitForTimeout(300);
+  await press(page, 'Enter');
+  await waitFor(page, (v) => v.name === 'DifficultyScene');
+  await page.waitForTimeout(300);
+  await press(page, 'Enter');
+  await waitFor(page, (v) => v.name === 'GameScene' && v.state === 'play', 10000);
+  if (!(await back())) throw new Error('back in game should be handled');
+  await waitFor(page, (v) => v.name === 'PauseScene');
+  await page.waitForTimeout(300);
+  await back();
+  await waitFor(page, (v) => v.name === 'GameScene');
+  // saves survive a restart of the app
+  await page.evaluate(() => localStorage.setItem('aetherlance.test', 'kept'));
+  await page.reload();
+  await waitFor(page, (v) => v.name === 'BootScene', 10000);
+  if ((await page.evaluate(() => localStorage.getItem('aetherlance.test'))) !== 'kept') throw new Error('localStorage lost');
+  if (blocked.length) throw new Error('unexpected network requests: ' + blocked.join(', '));
+  await page.screenshot({ path: path.join(out, 'android_shell.png') });
+}, { ...devices['Pixel 7 landscape'] });
+
 server.close();
 console.log(results.join('\n'));
 process.exit(failures ? 1 : 0);

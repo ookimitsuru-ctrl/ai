@@ -1,0 +1,65 @@
+// AETHER LANCE for Android: a thin native shell around the single-file web build.
+// The game itself is ../../dist-single/aether-lance.html (run `npm run build:single` in aether-lance/ first,
+// or use ../build-apk.sh which does everything).
+plugins { id 'com.android.application' }
+
+def pkg = new groovy.json.JsonSlurper().parse(file('../../package.json'))
+def (vMajor, vMinor, vPatch) = pkg.version.tokenize('.').collect { it as int }
+
+def webHtml = file('../../dist-single/aether-lance.html')
+def webLicense = file('../../public/licenses/DotGothic16-OFL.txt')
+def webAssetsDir = layout.buildDirectory.dir('generated/webassets')
+
+android {
+    namespace 'com.aetherlance.game'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'com.aetherlance.game'
+        minSdk 26
+        targetSdk 34
+        versionCode vMajor * 10000 + vMinor * 100 + vPatch
+        versionName pkg.version
+    }
+    // One shared key for every build (local and CI), so a newer APK installs over an older one.
+    // It is NOT a secret: use your own key if you ever publish to a store.
+    signingConfigs {
+        shared {
+            storeFile file('../keystore/aetherlance.keystore')
+            storePassword 'aetherlance'
+            keyAlias 'aetherlance'
+            keyPassword 'aetherlance'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.shared
+        }
+        debug {
+            signingConfig signingConfigs.shared
+        }
+    }
+    sourceSets {
+        main { assets.srcDirs += webAssetsDir }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint {
+        abortOnError false
+    }
+}
+
+// Copy the web build into the APK's assets (served from https://appassets.androidplatform.net/ by MainActivity).
+def copyWebAssets = tasks.register('copyWebAssets', Copy) {
+    doFirst {
+        if (!webHtml.exists()) {
+            throw new GradleException("Missing ${webHtml}. Run `npm run build:single` in aether-lance/ first (or ./build-apk.sh).")
+        }
+    }
+    from(webHtml) { rename { 'index.html' } }
+    from(webLicense) { into 'licenses' }
+    into webAssetsDir.map { it.dir('www') }
+}
+tasks.named('preBuild') { dependsOn copyWebAssets }

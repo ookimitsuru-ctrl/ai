@@ -4,7 +4,7 @@
 
 - 全6ステージ。各ステージに中ボスとボスがいて、ステージ6のあとに2周目があります。
 - グラフィック・BGM・効果音は、すべてコードで生成しています。画像ファイルや音声ファイルは使っていません。
-- PC（キーボード／ゲームパッド）とスマートフォン（タッチ）の両方で遊べます。
+- PC（キーボード／ゲームパッド）とスマートフォン（タッチ）の両方で遊べます。Android 用の APK もあります。
 - 設計書は [`docs/`](docs/README.md) にあります。実装上の補足は [`IMPLEMENTATION_NOTES.md`](IMPLEMENTATION_NOTES.md) にまとめました。
 
 ---
@@ -13,20 +13,31 @@
 
 ### A. 単一HTMLファイルで遊ぶ（いちばん手軽）
 
-`aether-lance.html` は1つのファイルで完結しています。ダブルクリックしてブラウザで開くだけで遊べます。サーバーもインターネット接続もいりません（日本語フォントは、オンラインのときだけ DotGothic16 を読み込みます）。
+`aether-lance.html` は1つのファイルで完結しています。ダブルクリックしてブラウザで開くだけで遊べます。サーバーもインターネット接続もいりません（日本語のドットフォント DotGothic16 も、使う文字だけを埋め込んであります）。
 
 ファイルの入手方法は次の2つです。
 
 - **GitHub Actions から:** このリポジトリの Actions →「AETHER LANCE」ワークフローの実行結果 → Artifacts の `aether-lance-single-html` をダウンロードして展開します。
 - **自分でビルドする:** 下記「3. 開発」の手順で `npm run build:single` を実行すると、`dist-single/aether-lance.html` ができます。
 
-### B. GitHub Pages で遊ぶ
+### B. Android アプリ（APK）で遊ぶ
+
+- **APK の入手:** リポジトリの [`dist/AetherLance.apk`](../dist/AetherLance.apk) をダウンロードします。Actions の実行結果の Artifacts `aether-lance-apk` からも入手できます。
+- **インストール:** Android 端末で APK を開き、「提供元不明のアプリ」のインストールを許可してインストールします（Android 8.0 以上）。
+- 横画面・全画面で起動します。インターネット接続は不要で、通信の権限も持っていません。
+- **戻るボタン:** ゲーム中はポーズ、メニューでは「戻る」として働きます。タイトル画面で押すとアプリを終了します。
+- セーブデータ（設定・ハイスコア・リプレイ）はアプリ内に保存されます。新しい版の APK は、上書きインストールでデータを引き継げます（すべての版を同じ鍵で署名しています）。
+- Bluetooth のゲームパッドやキーボードもそのまま使えます。
+
+APK は、ゲーム本体（単一HTML版）を全画面の WebView で動かす小さなアプリです（約170KB）。作り方は「3. 開発」を参照してください。
+
+### C. GitHub Pages で遊ぶ
 
 ワークフロー `.github/workflows/aether-lance.yml` は、デフォルトブランチへの push で `dist/` を GitHub Pages に公開します。初回だけ、リポジトリの Settings → Pages → Source を「GitHub Actions」にしてください。
 
 Pages 版は PWA に対応しています。スマートフォンで「ホーム画面に追加」すると、全画面で、しかもオフラインでも遊べます（iPhone では、ブラウザ上ではフルスクリーンにできないため、この方法がおすすめです）。
 
-### C. 開発サーバーで遊ぶ
+### D. 開発サーバーで遊ぶ
 
 ```bash
 cd aether-lance
@@ -166,6 +177,8 @@ Node.js 22 以上を推奨します（Vite 8 の要件）。実行時の依存�
 | `npm test` | ユニットテスト（MML とステージの拍の整合、全ステージの自動クリア、全ボスの撃破、決定性、リプレイ） |
 | `npm run lint` | 型チェックのみ |
 | `npm run e2e` | Playwright による E2E テスト（先に `build` と `build:single` が必要） |
+| `./android/build-apk.sh` | Android 用 APK を `dist-apk/AetherLance.apk` にビルド（JDK 17 以上、Gradle 8.7 以上、Android SDK の platform 34 が必要。`ANDROID_HOME` を設定しておく） |
+| `node scripts/subset-font.mjs` | 画面に出す文字を増やしたときに、埋め込みフォント（DotGothic16 のサブセット）を作り直す |
 
 **デバッグモード:** URL に `?debug=1` を付けて開くと、デバッグ表示とデバッグキーが使えます。
 
@@ -192,6 +205,7 @@ src/game      ワールド（固定順の更新）、自機・武器・ドロー
 src/content   スプライト、敵、ボス、ステージ、背景、楽曲（すべてコードで定義）
 src/scenes    タイトル、メニュー、ゲーム、ポーズ、オプション、練習、ランキング、エンディング、デモ
 tests/unit    Vitest、tests/e2e  Playwright
+android/      Android アプリ（WebView のシェル。MainActivity.java が APK 内のゲームを https://appassets.androidplatform.net/ として配信する）
 ```
 
 ---
@@ -199,6 +213,6 @@ tests/unit    Vitest、tests/e2e  Playwright
 ## 4. クレジット
 
 - ゲームデザイン、プログラム、グラフィック、音楽、効果音: AETHER LANCE 制作チーム（Claude Code で開発）
-- フォント: [DotGothic16](https://fonts.google.com/specimen/DotGothic16)（SIL Open Font License 1.1）
+- フォント: [DotGothic16](https://fonts.google.com/specimen/DotGothic16)（Copyright 2020 The DotGothic16 Project Authors、SIL Open Font License 1.1。ライセンス全文は `public/licenses/DotGothic16-OFL.txt`）
 
 本作は特定の既存作品の再現や移植ではない、オリジナル作品です。

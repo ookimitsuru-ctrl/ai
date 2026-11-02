@@ -11,6 +11,38 @@ import { ALL_STAGES } from './content/stages/index';
 import { BootScene, TitleScene } from './scenes/title';
 import { font } from './render/font';
 import { PAL } from './render/palette';
+import dotGothicUrl from './assets/fonts/DotGothic16-subset.woff2?url';
+
+// DotGothic16 (subset) — Copyright 2020 The DotGothic16 Project Authors, SIL Open Font License 1.1.
+// The notice ships in index.html and the full license in public/licenses/ (appended to the single-file build).
+function loadFont(): void {
+  // Bundled subset (inlined as a data URI by Vite), so Japanese text keeps its pixel look offline and in the APK.
+  try {
+    const ff = new FontFace('DotGothic16', `url(${dotGothicUrl}) format('woff2')`);
+    document.fonts.add(ff);
+    void ff.load().catch(() => { /* fall back to system fonts */ });
+  } catch { /* FontFace API unavailable */ }
+}
+
+/** Hook for the Android shell's back button: returns true when the game handled it (false = leave the app). */
+function installAndroidBack(): void {
+  const tap = (code: string) => {
+    const dev = input.lastDevice; // a back press should not hide the touch buttons
+    window.dispatchEvent(new KeyboardEvent('keydown', { code, key: code, bubbles: true }));
+    input.lastDevice = dev;
+    setTimeout(() => window.dispatchEvent(new KeyboardEvent('keyup', { code, key: code, bubbles: true })), 90);
+  };
+  Object.assign(window as object, {
+    AetherLance: {
+      back(): boolean {
+        const id = scenes.top?.id;
+        if (!id || id === 'BootScene' || id === 'TitleScene') return false;
+        tap('Escape');
+        return true;
+      },
+    },
+  });
+}
 
 function showError(err: unknown): void {
   const msg = err instanceof Error ? `${err.message}\n${err.stack ?? ''}` : String(err);
@@ -34,6 +66,8 @@ function showError(err: unknown): void {
 }
 
 function boot(): void {
+  loadFont();
+  installAndroidBack();
   save.data = loadSave();
   const root = document.getElementById('app')!;
   renderer.init(root);

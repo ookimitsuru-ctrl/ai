@@ -18,6 +18,9 @@ import { DemoScene } from './demo';
 
 export { VERSION };
 
+/** The silent-switch hint only matters on iPhone / iPad. */
+const IOS = typeof navigator !== 'undefined' && (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
 export class BootScene implements Scene {
   readonly id = 'BootScene';
   t = 0;
@@ -35,7 +38,7 @@ export class BootScene implements Scene {
     const h = renderer.hud;
     f.draw(h, 'AETHER LANCE', 240, 110, 'N7', 2, 'center');
     if ((this.t >> 5) % 2 === 0) f.draw(h, t('boot.tap'), 240, 150, 'C4', 1, 'center');
-    if (!save.data.progress.seenIntro) renderer.text(t('boot.ios'), 240, 230, { size: 7, align: 'center', color: 'N5' });
+    if (!save.data.progress.seenIntro && IOS) renderer.text(t('boot.ios'), 240, 230, { size: 7, align: 'center', color: 'N5' });
   }
 }
 

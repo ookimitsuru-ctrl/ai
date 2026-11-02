@@ -60,11 +60,16 @@ function defaultLang(): 'ja' | 'en' {
   try { return (navigator.language || 'ja').toLowerCase().startsWith('ja') ? 'ja' : 'en'; } catch { return 'ja'; }
 }
 
+/** Phones and tablets: integer scaling wastes too much of a small screen, so they start in FIT. */
+function coarsePointer(): boolean {
+  try { return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches; } catch { return false; }
+}
+
 export function defaultSettings(): Settings {
   return {
     lang: defaultLang(), shotMode: 'hold', touchSensitivity: 1.3, touchLayout: 'right', touchAlwaysFire: false, vibration: true,
     keys: structuredClone(DEFAULT_KEYS), pad: structuredClone(DEFAULT_PAD), analogMove: false,
-    scaleMode: 'integer', scaleFilter: 'sharp', crt: 'light', scanline: 15, bloom: 55, interpolate: true, quality: 'auto', showFps: false,
+    scaleMode: coarsePointer() ? 'fit' : 'integer', scaleFilter: 'sharp', crt: 'light', scanline: 15, bloom: 55, interpolate: true, quality: 'auto', showFps: false,
     volMaster: 8, volBgm: 7, volSfx: 8,
     shake: 'full', flashReduce: false, bulletEmphasis: false, showHitbox: false, bgDim: 0, gameSpeed: 100,
   };

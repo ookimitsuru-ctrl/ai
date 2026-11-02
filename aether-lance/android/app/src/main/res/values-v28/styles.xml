@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- draw under the camera cutout (it sits on a short edge in landscape) -->
+    <style name="Theme.AetherLance" parent="Theme.AetherLance.Base">
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+</resources>
