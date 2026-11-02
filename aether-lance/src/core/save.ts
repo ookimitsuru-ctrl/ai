@@ -1,5 +1,6 @@
 // Persistent data (docs/09_ui.md §8). All storage access is wrapped: the game must run without it.
 import { DEFAULT_KEYS, DEFAULT_PAD, type KeyBindings, type PadBindings } from './input';
+import { HD } from './hd';
 
 export type Difficulty = 'easy' | 'normal' | 'hard' | 'ordeal';
 export const DIFFS: Difficulty[] = ['easy', 'normal', 'hard', 'ordeal'];
@@ -54,7 +55,9 @@ export interface SaveData {
   achievements: string[];
 }
 
-const KEY = 'aetherlance.save.v1';
+/** The HD edition keeps its own save (settings differ; both may share a browser origin). */
+export const SAVE_KEY = HD ? 'aetherlance.hd.save.v1' : 'aetherlance.save.v1';
+const KEY = SAVE_KEY;
 
 function defaultLang(): 'ja' | 'en' {
   try { return (navigator.language || 'ja').toLowerCase().startsWith('ja') ? 'ja' : 'en'; } catch { return 'ja'; }
@@ -69,7 +72,8 @@ export function defaultSettings(): Settings {
   return {
     lang: defaultLang(), shotMode: 'hold', touchSensitivity: 1.3, touchLayout: 'right', touchAlwaysFire: false, vibration: true,
     keys: structuredClone(DEFAULT_KEYS), pad: structuredClone(DEFAULT_PAD), analogMove: false,
-    scaleMode: coarsePointer() ? 'fit' : 'integer', scaleFilter: 'sharp', crt: 'light', scanline: 15, bloom: 55, interpolate: true, quality: 'auto', showFps: false,
+    // HD edition: smooth scaling and no CRT emulation by default
+    scaleMode: HD || coarsePointer() ? 'fit' : 'integer', scaleFilter: HD ? 'soft' : 'sharp', crt: HD ? 'off' : 'light', scanline: HD ? 0 : 15, bloom: HD ? 50 : 55, interpolate: true, quality: 'auto', showFps: false,
     volMaster: 8, volBgm: 7, volSfx: 8,
     shake: 'full', flashReduce: false, bulletEmphasis: false, showHitbox: false, bgDim: 0, gameSpeed: 100,
   };

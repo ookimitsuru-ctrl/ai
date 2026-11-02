@@ -2,6 +2,14 @@
 import { makeCanvas, ctx2d, tinted, type Canvas } from './sprite';
 import { PAL, type PalKey } from './palette';
 import { pv } from '../core/pv';
+import { HD } from '../core/hd';
+
+// HD edition: the same API draws vector text (Rajdhani) sized to match the pixel font's cap height.
+let measureCtx: CanvasRenderingContext2D | null = null;
+function hdFont(cellH: number, scale: number): string {
+  const px = (cellH >= 8 ? 10.4 : 7.4) * scale;
+  return `${cellH >= 8 && scale >= 2 ? 700 : 600} ${px}px "Rajdhani", "Noto Sans", "Noto Sans Symbols 2", "Segoe UI Symbol", sans-serif`;
+}
 
 const G5: Record<string, string> = {
   A: '.###.|#...#|#...#|#####|#...#|#...#|#...#',
@@ -119,11 +127,17 @@ export class BitmapFont {
   }
 
   width(text: string, scale = 1): number {
+    if (HD) {
+      measureCtx ??= document.createElement('canvas').getContext('2d')!;
+      measureCtx.font = hdFont(this.ch, scale);
+      return measureCtx.measureText(text).width;
+    }
     return text.length ? (text.length * this.cw - 1) * scale : 0;
   }
 
   draw(g: CanvasRenderingContext2D, text: string, x: number, y: number, color: PalKey | string = 'N8', scale = 1, align: 'left' | 'center' | 'right' = 'left', shadow?: PalKey | string): void {
     if (pv.textless) return;
+    if (HD) { this.drawHD(g, text, x, y, color, scale, align, shadow); return; }
     if (shadow) this.draw(g, text, x + scale, y + scale, shadow, scale, align);
     const hex = color.startsWith('#') || color.startsWith('rgb') ? color : PAL[color as PalKey];
     const sheet = this.sheet(hex);
@@ -137,6 +151,24 @@ export class BitmapFont {
       if (i !== undefined && ch !== ' ') g.drawImage(sheet, i * this.cw, 0, this.cw, this.ch, cx, cy, this.cw * scale, this.ch * scale);
       cx += this.cw * scale;
     }
+  }
+
+  private drawHD(g: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, scale: number, align: 'left' | 'center' | 'right', shadow?: string): void {
+    const hex = color.startsWith('#') || color.startsWith('rgb') || color.startsWith('hsl') ? color : PAL[color as PalKey];
+    g.save();
+    g.font = hdFont(this.ch, scale);
+    g.textAlign = align;
+    g.textBaseline = 'alphabetic';
+    const base = y + (this.ch - 1) * scale; // the pixel glyphs sit on y .. y + cap height
+    if (shadow) {
+      g.fillStyle = shadow.startsWith('#') || shadow.startsWith('rgb') ? shadow : PAL[shadow as PalKey];
+      g.globalAlpha *= 0.85;
+      g.fillText(text, x + 0.6 * scale, base + 0.7 * scale);
+      g.globalAlpha /= 0.85;
+    }
+    g.fillStyle = hex;
+    g.fillText(text, x, base);
+    g.restore();
   }
 }
 

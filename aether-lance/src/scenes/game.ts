@@ -1,5 +1,7 @@
 // In-game scene: runs a World per stage, overlays (intro card, WARNING, clear tally, continue), progression.
 import { scenes, type Scene } from '../core/scene';
+import { HD, TEXT_FONT, TEXT_WEIGHT } from '../core/hd';
+import { WorldViewHD } from '../render/worldRenderHD';
 import { pv } from '../core/pv';
 import { input, ACT } from '../core/input';
 import { save, persist, rankPosition } from '../core/save';
@@ -91,7 +93,7 @@ export class GameScene implements Scene {
     this.world.continues = r.continues;
     this.world.renderHooks.wave = (x, y, rr, life, s) => renderer.addWave(x, y, rr, life, s);
     this.world.renderHooks.chroma = (v) => { renderer.chroma = Math.max(renderer.chroma, v); };
-    this.view = new WorldView(this.world);
+    this.view = HD ? new WorldViewHD(this.world) : new WorldView(this.world);
     this.view.hitboxes = !!this.debug?.hitboxes;
     this.stageT = r.startAt === 'start' || r.mode === 'bossrush' ? 0 : 200;
     this.tally = null;
@@ -483,7 +485,7 @@ export class GameScene implements Scene {
       o.strokeStyle = full ? PAL.Y4 : PAL.N6; o.lineWidth = 2; o.stroke();
       o.globalAlpha = 0.9;
       o.fillStyle = PAL.N8;
-      o.font = `${b.id === 'drive' ? 13 : 11}px "DotGothic16", sans-serif`;
+      o.font = `${TEXT_WEIGHT}${b.id === 'drive' ? 13 : 11}px ${TEXT_FONT}`;
       o.textAlign = 'center'; o.textBaseline = 'middle';
       o.fillText(b.id === 'drive' ? 'DRIVE' : b.id === 'form' ? 'FORM' : 'II', b.cx, b.cy + 1);
     }

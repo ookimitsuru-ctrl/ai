@@ -1,6 +1,7 @@
 // STAGE 3 background: a forest swallowed by the hive.
 import { PAL } from '../../render/palette';
-import { makeCanvas, ctx2d, type Canvas } from '../../render/sprite';
+import { layerCanvas, type Canvas } from '../../render/sprite';
+import { blit, lw, snap } from '../../core/hd';
 import { gradientCanvas, drawRepeat, fbm, paintCanvas, rampPick } from './common';
 import { Rng } from '../../core/rng';
 import type { Background } from './index';
@@ -8,8 +9,7 @@ import type { World } from '../../game/world';
 
 function stalks(): { c: Canvas; veins: { x: number; y0: number; y1: number }[] } {
   const W = 900, H = 270;
-  const c = makeCanvas(W, H);
-  const g = ctx2d(c);
+  const { c, g } = layerCanvas(W, H);
   const r = new Rng(17);
   const veins: { x: number; y0: number; y1: number }[] = [];
   for (let i = 0; i < 7; i++) {
@@ -36,8 +36,7 @@ function canopy(): Canvas {
 }
 
 function membranes(): Canvas {
-  const c = makeCanvas(1100, 270);
-  const g = ctx2d(c);
+  const { c, g } = layerCanvas(1100, 270);
   const r = new Rng(23);
   for (let i = 0; i < 6; i++) {
     const x = r.next() * 1100, y = 40 + r.next() * 190, rx = 30 + r.next() * 50, ry = 20 + r.next() * 40;
@@ -61,9 +60,9 @@ export function hiveBackground(_w: World): Background {
       drawRepeat(g, can, w.bgX, 0.03, 0);
       // stalks with pulsing veins
       const f = 0.15;
-      let x0 = -((w.bgX * f) % st.c.width); if (x0 > 0) x0 -= st.c.width;
-      for (let ox = x0; ox < 480; ox += st.c.width) {
-        g.drawImage(st.c, Math.round(ox), 0);
+      let x0 = -((w.bgX * f) % lw(st.c)); if (x0 > 0) x0 -= lw(st.c);
+      for (let ox = x0; ox < 480; ox += lw(st.c)) {
+        blit(g, st.c, snap(ox), 0);
         const pulse = 0.5 + 0.5 * Math.sin(w.frame * 0.07);
         g.fillStyle = PAL.T2;
         for (const v of st.veins) {

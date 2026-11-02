@@ -1,22 +1,23 @@
 // STAGE 5 background: orbital foundry interior (supports vertical scrolling).
 import { PAL } from '../../render/palette';
-import { makeCanvas, ctx2d, type Canvas } from '../../render/sprite';
+import { layerCanvas, type Canvas } from '../../render/sprite';
+import { blit, lw, lh, snap } from '../../core/hd';
 import { drawGlow } from '../../render/draw';
 import { Rng } from '../../core/rng';
 import type { Background } from './index';
 import type { World } from '../../game/world';
 
 function tileLayer(w: number, h: number, seed: number, fn: (g: CanvasRenderingContext2D, r: Rng) => void): Canvas {
-  const c = makeCanvas(w, h);
-  const g = ctx2d(c);
+  const { c, g } = layerCanvas(w, h);
   fn(g, new Rng(seed));
   return c;
 }
 
 function drawTiled(g: CanvasRenderingContext2D, c: Canvas, ox: number, oy: number): void {
-  let x0 = -(ox % c.width); if (x0 > 0) x0 -= c.width;
-  let y0 = -(oy % c.height); if (y0 > 0) y0 -= c.height;
-  for (let y = y0; y < 270; y += c.height) for (let x = x0; x < 480; x += c.width) g.drawImage(c, Math.round(x), Math.round(y));
+  const W = lw(c), H = lh(c);
+  let x0 = -(ox % W); if (x0 > 0) x0 -= W;
+  let y0 = -(oy % H); if (y0 > 0) y0 -= H;
+  for (let y = y0; y < 270; y += H) for (let x = x0; x < 480; x += W) blit(g, c, snap(x), snap(y));
 }
 
 export function foundryBackground(_w: World): Background {

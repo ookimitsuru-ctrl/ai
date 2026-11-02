@@ -3,6 +3,7 @@ import { PAL, rgba } from './palette';
 import { font } from './font';
 import { fromStrings, type Sprite } from './sprite';
 import type { World } from '../game/world';
+import { HD } from '../core/hd';
 
 let shipIcon: Sprite | null = null;
 let fade = 1;
@@ -16,9 +17,19 @@ export function drawHud(g: CanvasRenderingContext2D, w: World, hi: number, label
   fade += ((near ? 0.3 : 1) - fade) * 0.1;
   g.globalAlpha = fade;
   // bands
-  g.fillStyle = rgba('N0', 0.45);
-  g.fillRect(0, 0, 480, 12);
-  g.fillRect(0, 256, 480, 14);
+  if (HD) {
+    // soft gradient plates keep the vector text readable over bright stages
+    const top = g.createLinearGradient(0, 0, 0, 16);
+    top.addColorStop(0, 'rgba(6,8,16,0.72)'); top.addColorStop(0.7, 'rgba(6,8,16,0.5)'); top.addColorStop(1, 'rgba(6,8,16,0)');
+    g.fillStyle = top; g.fillRect(0, 0, 480, 16);
+    const bot = g.createLinearGradient(0, 252, 0, 270);
+    bot.addColorStop(0, 'rgba(6,8,16,0)'); bot.addColorStop(0.3, 'rgba(6,8,16,0.55)'); bot.addColorStop(1, 'rgba(6,8,16,0.78)');
+    g.fillStyle = bot; g.fillRect(0, 252, 480, 18);
+  } else {
+    g.fillStyle = rgba('N0', 0.45);
+    g.fillRect(0, 0, 480, 12);
+    g.fillRect(0, 256, 480, 14);
+  }
   // top
   const sc = String(Math.floor(w.displayScore)).padStart(10, '0');
   f.draw(g, '1P', 4, 2, 'C4');

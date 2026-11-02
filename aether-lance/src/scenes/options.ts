@@ -1,7 +1,7 @@
 // Options, key config and controls reference (docs/09_ui.md §3.14–3.15).
 import { scenes, type Scene } from '../core/scene';
 import { input, ACTIONS, keyLabel, padLabel, DEFAULT_KEYS, DEFAULT_PAD, type Action } from '../core/input';
-import { save, persist, defaultSettings, defaultSave } from '../core/save';
+import { save, persist, defaultSettings, defaultSave, SAVE_KEY } from '../core/save';
 import { renderer } from '../render/renderer';
 import { font } from '../render/font';
 import { PAL } from '../render/palette';
@@ -83,7 +83,7 @@ export class OptionsScene implements Scene {
         { label: L('opt.resetSettings'), action: () => this.confirm.open(t('confirm.reset'), set(() => { const lang = S().lang; save.data.settings = defaultSettings(); save.data.settings.lang = lang; })) },
         { label: L('opt.erase'), action: () => this.confirm.open(t('confirm.erase'), () => setTimeout(() => this.confirm.open(t('confirm.erase2'), () => { const st = save.data.settings; save.data = defaultSave(); save.data.settings = st; eraseReplays(); persist(); }), 0)) },
         { label: L('opt.export'), action: () => { try { void navigator.clipboard.writeText(btoa(unescape(encodeURIComponent(JSON.stringify(save.data))))); audio.sfx('pickup_chip'); } catch { /* */ } } },
-        { label: L('opt.import'), action: () => { try { const s = window.prompt('SAVE DATA'); if (s) { const parsed = JSON.parse(decodeURIComponent(escape(atob(s.trim())))); localStorage.setItem('aetherlance.save.v1', JSON.stringify(parsed)); location.reload(); } } catch { /* */ } } },
+        { label: L('opt.import'), action: () => { try { const s = window.prompt('SAVE DATA'); if (s) { const parsed = JSON.parse(decodeURIComponent(escape(atob(s.trim())))); localStorage.setItem(SAVE_KEY, JSON.stringify(parsed)); location.reload(); } } catch { /* */ } } },
       ],
     };
     for (const tb of this.tabs) this.menus[tb] = new Menu(M[tb], 70, 66, 15, 'left', 340, 11);

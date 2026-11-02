@@ -24,3 +24,9 @@ export function blit(g: CanvasRenderingContext2D, c: ScaledCanvas, x: number, y:
   if (k === 1) g.drawImage(c, x, y);
   else g.drawImage(c, x, y, c.width / k, c.height / k);
 }
+
+/** Font stacks: pixel font (classic) or Rajdhani + the system's Japanese sans (HD). */
+export const TEXT_FONT = HD
+  ? '"Rajdhani", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Noto Sans CJK JP", "Yu Gothic", sans-serif'
+  : '"DotGothic16", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif';
+export const TEXT_WEIGHT = HD ? '600 ' : '';

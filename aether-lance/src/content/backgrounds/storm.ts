@@ -1,6 +1,8 @@
 // STAGE 4 background: upper atmosphere of a gas giant — storm towers, cloud sea, speed lines.
 import { PAL } from '../../render/palette';
-import { makeCanvas, ctx2d, type Canvas } from '../../render/sprite';
+import { HD } from '../../core/hd';
+import { layerCanvas, type Canvas } from '../../render/sprite';
+import { blit, lw, snap } from '../../core/hd';
 import { gradientCanvas, drawRepeat, fbm, paintCanvas, rampPick } from './common';
 import { lightningPts, stampLine, drawGlow } from '../../render/draw';
 import { fxRng } from '../../core/rng';
@@ -31,8 +33,13 @@ function cloudLayer(seed: number, h: number, ramp: ('N1' | 'N2' | 'N3' | 'N4' | 
 }
 
 function ringArc(): Canvas {
-  const c = makeCanvas(900, 120);
-  const g = ctx2d(c);
+  const { c, g } = layerCanvas(900, 120);
+  if (HD) {
+    // the same band as smooth strips
+    const strip = (dy: number, h: number, col: string) => { g.fillStyle = col; g.beginPath(); g.moveTo(0, 20 + dy); g.lineTo(900, 20 + 900 * 0.09 + dy); g.lineTo(900, 20 + 900 * 0.09 + dy + h); g.lineTo(0, 20 + dy + h); g.closePath(); g.fill(); };
+    strip(0, 6, PAL.P1); strip(1, 1, PAL.P2); strip(8, 2, PAL.N3);
+    return c;
+  }
   for (let x = 0; x < 900; x++) {
     const y = 20 + x * 0.09;
     g.fillStyle = PAL.P1; g.fillRect(x, Math.round(y), 1, 6);
@@ -52,7 +59,7 @@ export function stormBackground(_w: World): Background {
   const lines = Array.from({ length: 24 }, (_, i) => ({ y: (i * 37) % 250 + 10, x: (i * 211) % 480, s: 3 + (i % 4) }));
   return {
     draw(g, w) {
-      g.drawImage(grad, 0, 0);
+      blit(g, grad, 0, 0);
       drawRepeat(g, ring, w.bgX, 0.01, 10);
       // distant storm towers with internal flashes
       drawRepeat(g, tw, w.bgX, 0.1, 0);

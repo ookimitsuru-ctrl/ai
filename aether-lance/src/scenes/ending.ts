@@ -1,5 +1,6 @@
 // Ending + staff roll (docs/01_concept.md §3.3).
 import { scenes, type Scene } from '../core/scene';
+import { blit, lw, lh } from '../core/hd';
 import { input } from '../core/input';
 import { rankPosition } from '../core/save';
 import { renderer } from '../render/renderer';
@@ -65,7 +66,7 @@ export class EndingScene implements Scene {
     g.globalAlpha = 1;
     this.stars.draw(g, k * 0.3, 0, k);
     const pl = planetCanvas(true);
-    g.drawImage(pl, Math.round(480 - pl.width + 60), 270 - pl.height + 50);
+    blit(g, pl, Math.round(480 - lw(pl) + 60), 270 - lh(pl) + 50);
     g.globalCompositeOperation = 'lighter';
     drawGlow(g, 60, 210, 120, PAL.Y3, 0.5 + Math.min(0.4, k / 2000));
     g.globalCompositeOperation = 'source-over';

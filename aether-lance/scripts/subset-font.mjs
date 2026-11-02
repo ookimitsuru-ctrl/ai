@@ -35,4 +35,16 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   fs.writeFileSync(path.join(outDir, 'DotGothic16-subset.woff2'), buf);
   fs.writeFileSync(path.join(outDir, 'subset-chars.txt'), chars);
   console.log(`wrote DotGothic16-subset.woff2 (${(buf.length / 1024).toFixed(1)} KB, ${[...chars].length} chars)`);
+  // HD edition: Rajdhani (SIL OFL 1.1) for HUD / menu / logo text, printable ASCII plus a few symbols
+  let latin = '';
+  for (let c = 0x20; c < 0x7f; c++) latin += String.fromCharCode(c);
+  latin += '×©·—–';
+  for (const wght of [600, 700]) {
+    const css2 = await (await fetch(`https://fonts.googleapis.com/css2?family=Rajdhani:wght@${wght}&text=` + encodeURIComponent(latin), { headers: { 'user-agent': ua } })).text();
+    const m2 = css2.match(/url\((https:\/\/[^)]+)\) format\('woff2'\)/);
+    if (!m2) { console.error('unexpected response for Rajdhani ' + wght); process.exit(1); }
+    const b2 = Buffer.from(await (await fetch(m2[1])).arrayBuffer());
+    fs.writeFileSync(path.join(outDir, `Rajdhani-${wght}.woff2`), b2);
+    console.log(`wrote Rajdhani-${wght}.woff2 (${(b2.length / 1024).toFixed(1)} KB)`);
+  }
 }

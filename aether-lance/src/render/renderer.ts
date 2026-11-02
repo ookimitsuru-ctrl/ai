@@ -4,7 +4,7 @@ import { makeCanvas, ctx2d, type Canvas } from './sprite';
 import { PAL, type PalKey } from './palette';
 import { input } from '../core/input';
 import { pv } from '../core/pv';
-import { HD, RS } from '../core/hd';
+import { HD, RS, TEXT_FONT, TEXT_WEIGHT } from '../core/hd';
 
 export const GW = 480;
 export const GH = 270;
@@ -408,7 +408,7 @@ export class Renderer {
     const g = this.overlay;
     this.gameTransform();
     const size = o.size ?? 8;
-    g.font = `${size}px "DotGothic16", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif`;
+    g.font = `${TEXT_WEIGHT}${HD ? size * 1.12 : size}px ${TEXT_FONT}`;
     g.textAlign = o.align ?? 'left';
     g.textBaseline = o.baseline ?? 'top';
     g.globalAlpha = o.alpha ?? 1;
@@ -428,7 +428,7 @@ export class Renderer {
     const g = this.overlay;
     this.gameTransform();
     const size = o.size ?? 8;
-    g.font = `${size}px "DotGothic16", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif`;
+    g.font = `${TEXT_WEIGHT}${HD ? size * 1.12 : size}px ${TEXT_FONT}`;
     const lines: string[] = [];
     for (const para of str.split('\n')) {
       let line = '';

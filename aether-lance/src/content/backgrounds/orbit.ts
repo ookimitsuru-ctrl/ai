@@ -1,6 +1,7 @@
 // STAGE 1 background: dusk planet, distant Halo Ring, debris silhouettes, foreground girders.
 import { PAL, type PalKey } from '../../render/palette';
-import { makeCanvas, ctx2d, type Canvas } from '../../render/sprite';
+import { makeCanvas, ctx2d, layerCanvas, type Canvas } from '../../render/sprite';
+import { blit, lw, lh, snap } from '../../core/hd';
 import { StarField, paintCanvas, rampPick, fbm, drawRepeat } from './common';
 import { Rng } from '../../core/rng';
 import type { World } from '../../game/world';
@@ -51,8 +52,7 @@ function makePlanet(dawn: boolean): Canvas {
 
 function ringCanvas(): Canvas {
   const W = 1400, H = 150;
-  const c = makeCanvas(W, H);
-  const g = ctx2d(c);
+  const { c, g } = layerCanvas(W, H);
   // a huge gentle arc
   for (let x = 0; x < W; x++) {
     const t = x / W;
@@ -69,8 +69,7 @@ function ringCanvas(): Canvas {
 
 function debrisLayer(): Canvas {
   const W = 1200, H = 270;
-  const c = makeCanvas(W, H);
-  const g = ctx2d(c);
+  const { c, g } = layerCanvas(W, H);
   const r = new Rng(91);
   for (let i = 0; i < 26; i++) {
     const x = r.next() * W, y = 20 + r.next() * 230, s = 2 + r.next() * 9;
@@ -99,8 +98,7 @@ function debrisLayer(): Canvas {
 
 function girders(): Canvas {
   const W = 2600, H = 270;
-  const c = makeCanvas(W, H);
-  const g = ctx2d(c);
+  const { c, g } = layerCanvas(W, H);
   g.fillStyle = '#05060c';
   const put = (x: number, top: boolean) => {
     const h = 70 + (x % 50);
@@ -125,8 +123,8 @@ export function orbitBackground(_w: World, dawn = false): Background {
       g.fillRect(0, 0, 480, 270);
       // faint nebula glow at top-left
       stars.draw(g, w.bgX, 0, w.frame);
-      const px = Math.round(480 - planet.width + 60 - Math.min(60, w.bgX * 0.006));
-      g.drawImage(planet, px, 270 - planet.height + 40);
+      const px = Math.round(480 - lw(planet) + 60 - Math.min(60, w.bgX * 0.006));
+      blit(g, planet, px, 270 - lh(planet) + 40);
       drawRepeat(g, ring, w.bgX, 0.05, 6);
       drawRepeat(g, deb, w.bgX, 0.3, 0);
     },
@@ -134,9 +132,9 @@ export function orbitBackground(_w: World, dawn = false): Background {
       if (w.stage.id !== 1) return;
       const p = w.player;
       g.globalAlpha = 0.55;
-      const x = -((w.bgX * 1.4) % fg.width);
-      g.drawImage(fg, Math.round(x), 0);
-      if (x + fg.width < 480) g.drawImage(fg, Math.round(x + fg.width), 0);
+      const x = -((w.bgX * 1.4) % lw(fg));
+      blit(g, fg, snap(x), 0);
+      if (x + lw(fg) < 480) blit(g, fg, snap(x + lw(fg)), 0);
       g.globalAlpha = 1;
       void p;
     },

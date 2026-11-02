@@ -1,5 +1,6 @@
 // Application-level glue: settings application, stage list, run state.
 import { save, persist, type Difficulty } from './core/save';
+import { HD } from './core/hd';
 import { input } from './core/input';
 import { renderer } from './render/renderer';
 import { audio } from './audio/engine';
@@ -80,7 +81,7 @@ export function runSnapshot(r: RunState): RunState {
 }
 
 // ---- replays: best run per board (docs/09_ui.md §8) ----------------------------------------------------------
-const replayKey = (board: string): string => 'aetherlance.replay.' + board;
+const replayKey = (board: string): string => (HD ? 'aetherlance.hd.replay.' : 'aetherlance.replay.') + board;
 export const REPLAY_BOARDS = ['easy', 'normal', 'hard', 'ordeal', 'bossrush'] as const;
 
 export function storeReplay(board: Difficulty | 'bossrush', entry: { name: string; score: number; date: string }, r: RunState): boolean {

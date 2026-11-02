@@ -1,5 +1,6 @@
 // Boot, Title, Main menu and Difficulty select (docs/09_ui.md §3.1–3.5).
 import { scenes, type Scene } from '../core/scene';
+import { HD } from '../core/hd';
 import { input } from '../core/input';
 import { save, DIFFS, type Difficulty } from '../core/save';
 import { renderer } from '../render/renderer';
@@ -66,7 +67,7 @@ export class TitleScene implements Scene {
     backdrop.draw(g);
     const h = renderer.hud;
     backdrop.drawLogo(h, 64, this.t);
-    renderer.text(t('title.sub'), 240, 100, { size: 10, align: 'center', color: 'C4' });
+    renderer.text(t('title.sub'), 240, HD ? 108 : 100, { size: 10, align: 'center', color: 'C4' });
     const f = font();
     if ((this.t >> 5) % 2 === 0) f.draw(h, t('title.press'), 240, 170, 'N8', 1, 'center', 'N0');
     f.draw(h, 'HI ' + String(hiScore('normal')).padStart(10, '0'), 240, 4, 'N6', 1, 'center');
@@ -99,7 +100,7 @@ export class MainMenuScene implements Scene {
     backdrop.draw(g, 0.25);
     const h = renderer.hud;
     backdrop.drawLogo(h, 40, this.t);
-    renderer.text(t('title.sub'), 240, 76, { size: 9, align: 'center', color: 'C4' });
+    renderer.text(t('title.sub'), 240, HD ? 84 : 76, { size: 9, align: 'center', color: 'C4' });
     panel(h, 150, 128, 180, 96, 0.6);
     this.menu.draw(h, this.t);
     this.menu.drawDesc(236);

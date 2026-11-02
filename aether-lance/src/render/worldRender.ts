@@ -4,6 +4,8 @@ import { drawSprite, makeCanvas, ctx2d, flashState, type Sprite } from './sprite
 import { disc, drawDisc, drawRing, stampLine, dashLine, drawGlow, lightningPts } from './draw';
 import { font, smallFont } from './font';
 import { TerrainRenderer, THEMES } from './terrainRender';
+import { TerrainRendererHD } from './terrainRenderHD';
+import { HD } from '../core/hd';
 import { fxRng } from '../core/rng';
 import { SPR } from '../content/sprites/registry';
 import { BACKGROUNDS, type Background } from '../content/backgrounds/index';
@@ -17,7 +19,7 @@ const L = (a: number, b: number, t: number) => a + (b - a) * t;
 
 export class WorldView {
   bg: Background;
-  terrain: TerrainRenderer;
+  terrain: TerrainRenderer | TerrainRendererHD;
   private light = makeCanvas(480, 270);
   private lg = ctx2d(this.light);
   private needleRot: Sprite[];
@@ -28,7 +30,8 @@ export class WorldView {
   constructor(public w: World) {
     const mk = BACKGROUNDS[w.stage.bgId] ?? BACKGROUNDS.space!;
     this.bg = mk(w);
-    this.terrain = new TerrainRenderer(w.terrain, THEMES[w.stage.theme] ?? THEMES.hull!);
+    const theme = THEMES[w.stage.theme] ?? THEMES.hull!;
+    this.terrain = HD ? new TerrainRendererHD(w.terrain, theme, w.stage.theme) : new TerrainRenderer(w.terrain, theme);
     this.terrain.warm(w.camX, w.camY);
     this.needleRot = SPR.needle!.rotations(16);
     this.missileRot = SPR.missile!.rotations(16);
@@ -74,7 +77,7 @@ export class WorldView {
   }
 
   // ---- terrain extras ---------------------------------------------------------------------------
-  private drawBreakables(g: CanvasRenderingContext2D): void {
+  protected drawBreakables(g: CanvasRenderingContext2D): void {
     const w = this.w;
     for (const b of w.terrain.breakables) {
       const x = Math.round(b.x - w.camX), y = Math.round(b.y - w.camY);
@@ -109,7 +112,7 @@ export class WorldView {
     }
   }
 
-  private drawDynamic(g: CanvasRenderingContext2D): void {
+  protected drawDynamic(g: CanvasRenderingContext2D): void {
     const w = this.w;
     for (const d of w.terrain.dyn) {
       const sx0 = Math.max(0, Math.floor(d.x0 - w.camX)), sx1 = Math.min(480, Math.ceil(d.x1 - w.camX));
@@ -152,7 +155,7 @@ export class WorldView {
   }
 
   // ---- enemies -----------------------------------------------------------------------------------
-  private drawEnemy(g: CanvasRenderingContext2D, e: Enemy, a: number): void {
+  protected drawEnemy(g: CanvasRenderingContext2D, e: Enemy, a: number): void {
     const x = L(e.px, e.x, a), y = L(e.py, e.y, a);
     if (x < -120 || x > 600 || y < -140 || y > 410) return;
     const def = e.def as { draw?: (g: CanvasRenderingContext2D, e: Enemy, x: number, y: number, w: World) => void; sprite?: string; anim?: number };
@@ -176,7 +179,7 @@ export class WorldView {
   }
   hitboxes = false;
 
-  private drawEnemyHitbox(g: CanvasRenderingContext2D, e: Enemy): void {
+  protected drawEnemyHitbox(g: CanvasRenderingContext2D, e: Enemy): void {
     g.strokeStyle = '#ff0'; g.lineWidth = 1;
     const sh = e.parts ? e.parts.filter((p) => p.alive).map((p) => ({ s: p.shape, x: p.x, y: p.y })) : [{ s: e.shape, x: e.x, y: e.y }];
     for (const { s, x, y } of sh) {
@@ -186,7 +189,7 @@ export class WorldView {
   }
 
   // ---- items --------------------------------------------------------------------------------------
-  private drawItems(g: CanvasRenderingContext2D, a: number): void {
+  protected drawItems(g: CanvasRenderingContext2D, a: number): void {
     const w = this.w;
     const f = font();
     for (const it of w.items.items) {
@@ -232,7 +235,7 @@ export class WorldView {
   }
 
   // ---- shots --------------------------------------------------------------------------------------
-  private drawShots(g: CanvasRenderingContext2D, a: number): void {
+  protected drawShots(g: CanvasRenderingContext2D, a: number): void {
     const w = this.w;
     g.globalCompositeOperation = 'lighter';
     for (const s of w.shots.items) {
@@ -283,7 +286,7 @@ export class WorldView {
   }
 
   // ---- player ----------------------------------------------------------------------------------------
-  private drawPlayer(g: CanvasRenderingContext2D, a: number, o: ViewOpts): void {
+  protected drawPlayer(g: CanvasRenderingContext2D, a: number, o: ViewOpts): void {
     const w = this.w;
     const p = w.player;
     // drones
@@ -301,12 +304,8 @@ export class WorldView {
     }
     // engine flame
     const len = [4, 7, 10, 13][p.speedLv - 1]! + (p.moveX > 0.3 ? 3 : p.moveX < -0.3 ? -2 : 0) + (fxRng.next() < 0.5 ? 1 : 0);
-    const fx = Math.round(x - 15), fy = Math.round(y);
     g.globalCompositeOperation = 'lighter';
-    g.fillStyle = PAL.O3; g.fillRect(fx - len, fy - 2, len, 4);
-    g.fillStyle = PAL.O5; g.fillRect(fx - Math.round(len * 0.75), fy - 1, Math.round(len * 0.75), 3);
-    g.fillStyle = PAL.O6; g.fillRect(fx - Math.round(len * 0.45), fy - 1, Math.round(len * 0.45), 2);
-    g.fillStyle = PAL.N8; g.fillRect(fx - 2, fy, 2, 1);
+    this.drawFlame(g, x - 15, y, len);
     if (p.driving) drawGlow(g, x, y, 26, PAL.Y3, 0.35 + 0.15 * Math.sin(w.frame * 0.4));
     g.globalCompositeOperation = 'source-over';
     // speed-change afterimages
@@ -331,7 +330,16 @@ export class WorldView {
     if (p.formLabel > 0) font().draw(g, p.formation.toUpperCase(), x, y - 22, 'C4', 1, 'center', 'N0');
   }
 
-  private drawBarrier(g: CanvasRenderingContext2D, x: number, y: number): void {
+  /** Engine exhaust behind the ship; (x, y) is the nozzle, len the flame length (additive blending is set). */
+  protected drawFlame(g: CanvasRenderingContext2D, x: number, y: number, len: number): void {
+    const fx = Math.round(x), fy = Math.round(y);
+    g.fillStyle = PAL.O3; g.fillRect(fx - len, fy - 2, len, 4);
+    g.fillStyle = PAL.O5; g.fillRect(fx - Math.round(len * 0.75), fy - 1, Math.round(len * 0.75), 3);
+    g.fillStyle = PAL.O6; g.fillRect(fx - Math.round(len * 0.45), fy - 1, Math.round(len * 0.45), 2);
+    g.fillStyle = PAL.N8; g.fillRect(fx - 2, fy, 2, 1);
+  }
+
+  protected drawBarrier(g: CanvasRenderingContext2D, x: number, y: number): void {
     const p = this.w.player;
     if (p.barrier <= 0) return;
     const rot = this.w.frame * 0.02;
@@ -348,7 +356,7 @@ export class WorldView {
   }
 
   // ---- particles ------------------------------------------------------------------------------------
-  private drawParticles(g: CanvasRenderingContext2D): void {
+  protected drawParticles(g: CanvasRenderingContext2D): void {
     const w = this.w;
     for (const q of w.particles.items) {
       if (!q.active) continue;
@@ -422,7 +430,7 @@ export class WorldView {
   }
 
   // ---- darkness (ST2) -------------------------------------------------------------------------------
-  private drawDark(g: CanvasRenderingContext2D): void {
+  protected drawDark(g: CanvasRenderingContext2D): void {
     const w = this.w;
     const lg = this.lg;
     lg.globalCompositeOperation = 'source-over';
@@ -458,7 +466,7 @@ export class WorldView {
   }
 
   // ---- telegraphs & hazards ---------------------------------------------------------------------------
-  private drawTeles(g: CanvasRenderingContext2D): void {
+  protected drawTeles(g: CanvasRenderingContext2D): void {
     const w = this.w;
     for (const t of w.teles.items) {
       if (!t.active) continue;
@@ -513,7 +521,7 @@ export class WorldView {
     }
   }
 
-  private drawHazards(g: CanvasRenderingContext2D): void {
+  protected drawHazards(g: CanvasRenderingContext2D): void {
     const w = this.w;
     for (const h of w.hazards.items) {
       if (!h.active) continue;
@@ -619,7 +627,7 @@ export class WorldView {
   }
 
   // ---- enemy bullets ---------------------------------------------------------------------------------
-  private drawBullets(g: CanvasRenderingContext2D, a: number, o: ViewOpts): void {
+  protected drawBullets(g: CanvasRenderingContext2D, a: number, o: ViewOpts): void {
     const w = this.w;
     const pel = SPR.pellet!, orb = SPR.orb!, globe = SPR.globe!, chip = SPR.chip!;
     for (const b of w.bullets.items) {
@@ -643,7 +651,7 @@ export class WorldView {
     void disc;
   }
 
-  private drawArc(g: CanvasRenderingContext2D, b: { x: number; y: number; arcR: number; angle: number; arcHalf: number; gapA: number; gapHalf: number; gapA2: number; fade: number }): void {
+  protected drawArc(g: CanvasRenderingContext2D, b: { x: number; y: number; arcR: number; angle: number; arcHalf: number; gapA: number; gapHalf: number; gapA2: number; fade: number }): void {
     const r = b.arcR;
     const n = Math.max(8, Math.round((r * b.arcHalf * 2 * Math.PI) / 180 / 2));
     const fadeOut = r > 200 ? (240 - r) / 40 : 1;
@@ -668,7 +676,7 @@ export class WorldView {
   }
 
   // ---- popups / warnings ------------------------------------------------------------------------------
-  private drawPopups(g: CanvasRenderingContext2D): void {
+  protected drawPopups(g: CanvasRenderingContext2D): void {
     const w = this.w;
     const sf = smallFont(), f = font();
     for (const p of w.popups.items) {
@@ -680,7 +688,7 @@ export class WorldView {
     }
   }
 
-  private drawWarnings(g: CanvasRenderingContext2D): void {
+  protected drawWarnings(g: CanvasRenderingContext2D): void {
     const w = this.w;
     const f = font();
     for (const wn of w.warnings) {

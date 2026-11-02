@@ -1,5 +1,7 @@
 // Shared animated backdrop for title & menus: dusk planet, stars, KESTREL fly-by, logo.
 import { PAL } from '../render/palette';
+import { HD, blit, lw, lh } from '../core/hd';
+import { layerCanvas } from '../render/sprite';
 import { makeCanvas, ctx2d, drawSprite, type Canvas } from '../render/sprite';
 import { font } from '../render/font';
 import { drawGlow } from '../render/draw';
@@ -10,8 +12,38 @@ import { pv } from '../core/pv';
 
 let logo: Canvas | null = null;
 
+/** HD logo: wide italic Rajdhani with a chrome-to-cyan gradient, dark outline and a soft cyan glow. */
+function logoCanvasHD(): Canvas {
+  const W = 300, H = 42;
+  const { c, g } = layerCanvas(W, H);
+  const text = 'AETHER LANCE';
+  g.font = '700 36px "Rajdhani", sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  const cx = W / 2, by = 33;
+  g.save();
+  g.translate(cx, by); g.transform(1, 0, -0.18, 1, 0, 0); g.translate(-cx, -by); // italic shear
+  if ('letterSpacing' in g) (g as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '2px';
+  g.shadowColor = 'rgba(51,183,232,0.85)'; g.shadowBlur = 10;
+  g.lineJoin = 'round'; g.lineWidth = 3.2; g.strokeStyle = '#0a1830';
+  g.strokeText(text, cx, by);
+  g.shadowBlur = 0;
+  const grd = g.createLinearGradient(0, by - 30, 0, by + 2);
+  grd.addColorStop(0, '#ffffff'); grd.addColorStop(0.38, '#d9f6ff'); grd.addColorStop(0.52, '#7fe0ff');
+  grd.addColorStop(0.56, '#33b7e8'); grd.addColorStop(1, '#135e8a');
+  g.fillStyle = grd;
+  g.fillText(text, cx, by);
+  // specular streak across the top of the letters
+  g.globalCompositeOperation = 'source-atop';
+  const sp = g.createLinearGradient(0, by - 30, 0, by - 18);
+  sp.addColorStop(0, 'rgba(255,255,255,0.0)'); sp.addColorStop(0.5, 'rgba(255,255,255,0.55)'); sp.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = sp; g.fillRect(0, by - 30, W, 12);
+  g.restore();
+  return c;
+}
+
 export function logoCanvas(): Canvas {
   if (logo) return logo;
+  if (HD) return (logo = logoCanvasHD());
   const f = font();
   const text = 'AETHER LANCE';
   const sc = 3;
@@ -58,7 +90,7 @@ export class Backdrop {
     g.fillStyle = PAL.N0; g.fillRect(0, 0, 480, 270);
     this.stars.draw(g, this.t * 0.6, 0, this.t);
     const pl = planetCanvas(false);
-    g.drawImage(pl, Math.round(480 - pl.width + 70 - Math.sin(this.t * 0.001) * 10), 270 - pl.height + 70);
+    blit(g, pl, Math.round(480 - lw(pl) + 70 - Math.sin(this.t * 0.001) * 10), 270 - lh(pl) + 70);
     // fly-by every 15 s
     if (this.t % 900 === 120) this.fly = 0;
     if (this.fly >= 0) {
@@ -77,17 +109,27 @@ export class Backdrop {
   drawLogo(g: CanvasRenderingContext2D, y: number, frame: number): void {
     if (pv.textless) return;
     const lc = logoCanvas();
-    const x = Math.round(240 - lc.width / 2);
-    g.drawImage(lc, x, y);
+    const LW = lw(lc), LH = lh(lc);
+    const x = Math.round(240 - LW / 2);
+    blit(g, lc, x, y);
     // lance streak
     const per = 300;
     const ph = frame % per;
     if (ph < 50) {
-      const sx = x - 40 + (ph / 40) * (lc.width + 80);
+      const sx = x - 40 + (ph / 40) * (LW + 80);
       g.globalCompositeOperation = 'lighter';
-      g.fillStyle = PAL.C4; g.fillRect(x - 30, y + lc.height / 2, Math.max(0, sx - x + 30), 1);
-      g.fillStyle = PAL.N8; g.fillRect(Math.round(sx - 30), y + lc.height / 2 - 1, 30, 3);
-      drawGlow(g, sx, y + lc.height / 2, 22, PAL.C3, 0.9);
+      if (HD) {
+        const tr = g.createLinearGradient(x - 30, 0, sx, 0);
+        tr.addColorStop(0, 'rgba(51,183,232,0)'); tr.addColorStop(1, 'rgba(127,224,255,0.9)');
+        g.fillStyle = tr; g.fillRect(x - 30, y + LH / 2 - 0.5, Math.max(0, sx - x + 30), 1);
+        const hd = g.createLinearGradient(sx - 30, 0, sx, 0);
+        hd.addColorStop(0, 'rgba(255,255,255,0)'); hd.addColorStop(1, 'rgba(255,255,255,1)');
+        g.fillStyle = hd; g.fillRect(sx - 30, y + LH / 2 - 1.2, 30, 2.4);
+      } else {
+        g.fillStyle = PAL.C4; g.fillRect(x - 30, y + LH / 2, Math.max(0, sx - x + 30), 1);
+        g.fillStyle = PAL.N8; g.fillRect(Math.round(sx - 30), y + LH / 2 - 1, 30, 3);
+      }
+      drawGlow(g, sx, y + LH / 2, 22, PAL.C3, 0.9);
       g.globalCompositeOperation = 'source-over';
     }
   }

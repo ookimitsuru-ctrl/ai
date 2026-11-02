@@ -1,6 +1,7 @@
 // STAGE 2 background: crystal caverns.
 import { PAL } from '../../render/palette';
-import { makeCanvas, ctx2d, type Canvas } from '../../render/sprite';
+import { layerCanvas, type Canvas } from '../../render/sprite';
+import { blit, lw, snap } from '../../core/hd';
 import { gradientCanvas, drawRepeat, fbm, paintCanvas, rampPick } from './common';
 import { Rng } from '../../core/rng';
 import type { Background } from './index';
@@ -8,8 +9,7 @@ import type { World } from '../../game/world';
 
 function pillars(): Canvas {
   const W = 960, H = 270;
-  const c = makeCanvas(W, H);
-  const g = ctx2d(c);
+  const { c, g } = layerCanvas(W, H);
   const r = new Rng(41);
   for (let i = 0; i < 9; i++) {
     const x = r.next() * W, w = 14 + r.next() * 26, top = r.next() < 0.5;

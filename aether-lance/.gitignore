@@ -9,3 +9,5 @@ android/build/
 android/app/build/
 android/local.properties
 pv/
+dist-hd/
+dist-single-tmp-hd/

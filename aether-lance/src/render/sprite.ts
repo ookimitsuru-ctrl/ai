@@ -62,7 +62,20 @@ export class Sprite {
   }
 
   get flash(): Canvas {
-    if (!this._flash) this._flash = tinted(this.canvas, '#ffffff');
+    if (!this._flash) {
+      if (this.k === 1) this._flash = tinted(this.canvas, '#ffffff');
+      else {
+        // HD: a bright glaze over the shaded sprite instead of a flat white silhouette
+        const c = makeCanvas(this.canvas.width, this.canvas.height) as ScaledCanvas;
+        c.k = this.k;
+        const g = ctx2d(c);
+        g.drawImage(this.canvas, 0, 0);
+        g.globalCompositeOperation = 'source-atop';
+        g.fillStyle = 'rgba(255,250,240,0.62)';
+        g.fillRect(0, 0, c.width, c.height);
+        this._flash = c;
+      }
+    }
     return this._flash;
   }
 

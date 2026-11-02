@@ -18,16 +18,25 @@ import { backdrop } from './scenes/backdrop';
 import { font } from './render/font';
 import { PAL } from './render/palette';
 import dotGothicUrl from './assets/fonts/DotGothic16-subset.woff2?url';
+import rajdhani600 from './assets/fonts/Rajdhani-600.woff2?url';
+import rajdhani700 from './assets/fonts/Rajdhani-700.woff2?url';
+import { HD, TEXT_FONT } from './core/hd';
 
 // DotGothic16 (subset) — Copyright 2020 The DotGothic16 Project Authors, SIL Open Font License 1.1.
 // The notice ships in index.html and the full license in public/licenses/ (appended to the single-file build).
 function loadFont(): void {
   // Bundled subset (inlined as a data URI by Vite), so Japanese text keeps its pixel look offline and in the APK.
-  try {
-    const ff = new FontFace('DotGothic16', `url(${dotGothicUrl}) format('woff2')`);
-    document.fonts.add(ff);
-    void ff.load().catch(() => { /* fall back to system fonts */ });
-  } catch { /* FontFace API unavailable */ }
+  // HD edition: Rajdhani (Latin, OFL) instead; Japanese falls back to the system's sans-serif.
+  const faces: [string, string, string][] = HD
+    ? [['Rajdhani', rajdhani600, '600'], ['Rajdhani', rajdhani700, '700']]
+    : [['DotGothic16', dotGothicUrl, '400']];
+  for (const [family, url, weight] of faces) {
+    try {
+      const ff = new FontFace(family, `url(${url}) format('woff2')`, { weight });
+      document.fonts.add(ff);
+      void ff.load().catch(() => { /* fall back to system fonts */ });
+    } catch { /* FontFace API unavailable */ }
+  }
 }
 
 /** Hook for the Android shell's back button: returns true when the game handled it (false = leave the app). */
@@ -57,7 +66,7 @@ function showError(err: unknown): void {
   if (document.getElementById('errbox')) return;
   const box = document.createElement('div');
   box.id = 'errbox';
-  box.style.cssText = 'position:fixed;inset:0;background:rgba(11,13,23,.94);color:#c6d2e3;font:14px "DotGothic16",sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:10;padding:16px;text-align:center';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(11,13,23,.94);color:#c6d2e3;font:14px ' + TEXT_FONT.replace(/"/g, "'") + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:10;padding:16px;text-align:center';
   const ja = save.data.settings.lang === 'ja';
   box.innerHTML = `<div style="font-size:20px;color:#ff9fd0">${ja ? 'エラーが発生しました' : 'An error occurred'}</div><pre style="max-width:90vw;max-height:40vh;overflow:auto;white-space:pre-wrap;font-size:11px;color:#97a9c6"></pre>`;
   box.querySelector('pre')!.textContent = msg.slice(0, 2000);

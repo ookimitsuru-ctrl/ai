@@ -1,6 +1,7 @@
 // STAGE 6 background: the Choir Core — white/gold geometry, beat pulses, organ pipes lit by the music.
 import { PAL } from '../../render/palette';
-import { makeCanvas, ctx2d, type Canvas } from '../../render/sprite';
+import { layerCanvas, type Canvas } from '../../render/sprite';
+import { blit, lw, snap } from '../../core/hd';
 import { gradientCanvas, drawRepeat } from './common';
 import { drawRing, drawGlow } from '../../render/draw';
 import { audio } from '../../audio/engine';
@@ -8,8 +9,7 @@ import type { Background } from './index';
 import type { World } from '../../game/world';
 
 function arches(): Canvas {
-  const c = makeCanvas(720, 270);
-  const g = ctx2d(c);
+  const { c, g } = layerCanvas(720, 270);
   for (let i = 0; i < 6; i++) {
     const x = i * 120 + 20;
     g.fillStyle = PAL.C0; g.fillRect(x, 40, 16, 230);
@@ -22,8 +22,7 @@ function arches(): Canvas {
 }
 
 function pipes(): Canvas {
-  const c = makeCanvas(600, 270);
-  const g = ctx2d(c);
+  const { c, g } = layerCanvas(600, 270);
   for (let i = 0; i < 24; i++) {
     const x = i * 25 + 4, h = 70 + ((i * 37) % 5) * 22;
     g.fillStyle = PAL.N2; g.fillRect(x, 270 - h, 12, h);
@@ -39,7 +38,7 @@ export function choirBackground(_w: World): Background {
   const pip = pipes();
   return {
     draw(g, w) {
-      g.drawImage(grad, 0, 0);
+      blit(g, grad, 0, 0);
       const silent = !!w.stageData.silence;
       // beat pulse rings from the centre
       if (!silent && w.stage.beatBpm) {
@@ -61,8 +60,8 @@ export function choirBackground(_w: World): Background {
       drawRepeat(g, arc, w.bgX, 0.15, 0);
       // organ pipes glow with the music
       const act = silent ? 0 : Math.max(audio.music?.activity('choir') ?? 0, audio.music?.activity('organ') ?? 0, audio.music?.activity('lead') ?? 0);
-      let x0 = -((w.bgX * 0.4) % pip.width); if (x0 > 0) x0 -= pip.width;
-      for (let x = x0; x < 480; x += pip.width) g.drawImage(pip, Math.round(x), 0);
+      let x0 = -((w.bgX * 0.4) % lw(pip)); if (x0 > 0) x0 -= lw(pip);
+      for (let x = x0; x < 480; x += lw(pip)) blit(g, pip, snap(x), 0);
       if (act > 0.05) {
         g.globalCompositeOperation = 'lighter';
         for (let i = 0; i < 20; i++) {
