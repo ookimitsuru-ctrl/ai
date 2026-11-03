@@ -1,0 +1,22 @@
+{
+  "name": "aether-lance",
+  "private": true,
+  "version": "1.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:hd": "tsc --noEmit && AL_EDITION=hd vite build --outDir dist-hd",
+    "build:single": "vite build --outDir dist-single-tmp --emptyOutDir && node scripts/singlefile.mjs dist-single-tmp dist-single/aether-lance.html",
+    "build:single:hd": "AL_EDITION=hd vite build --outDir dist-single-tmp-hd --emptyOutDir && node scripts/singlefile.mjs dist-single-tmp-hd dist-single/aether-lance-hd.html",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "e2e": "node tests/e2e/run.mjs"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dist-single/
+dist-single-tmp/
+tests/e2e/out/
+dist-apk/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+pv/
+dist-hd/
+dist-single-tmp-hd/
+device-test-*/
+__pycache__/

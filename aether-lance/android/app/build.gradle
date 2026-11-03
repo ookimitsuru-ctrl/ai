@@ -1,0 +1,82 @@
+// AETHER LANCE for Android: a thin native shell around the single-file web build, in two editions (flavours):
+//   classic — pixel art, com.aetherlance.game,    ../../dist-single/aether-lance.html    (npm run build:single)
+//   hd      — modern HD art, com.aetherlance.game.hd, ../../dist-single/aether-lance-hd.html (npm run build:single:hd)
+// ../build-apk.sh builds both web files and both APKs.
+plugins { id 'com.android.application' }
+
+def pkg = new groovy.json.JsonSlurper().parse(file('../../package.json'))
+def (vMajor, vMinor, vPatch) = pkg.version.tokenize('.').collect { it as int }
+
+def editions = [classic: file('../../dist-single/aether-lance.html'), hd: file('../../dist-single/aether-lance-hd.html')]
+def licensesDir = file('../../public/licenses')
+
+android {
+    namespace 'com.aetherlance.game'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'com.aetherlance.game'
+        minSdk 26
+        targetSdk 34
+        versionCode vMajor * 10000 + vMinor * 100 + vPatch
+        versionName pkg.version
+    }
+    // One shared key for every build (local and CI), so a newer APK installs over an older one.
+    // It is NOT a secret: use your own key if you ever publish to a store.
+    signingConfigs {
+        shared {
+            storeFile file('../keystore/aetherlance.keystore')
+            storePassword 'aetherlance'
+            keyAlias 'aetherlance'
+            keyPassword 'aetherlance'
+        }
+    }
+    flavorDimensions += 'edition'
+    productFlavors {
+        classic {
+            dimension 'edition'
+            resValue 'string', 'app_name', 'AETHER LANCE'
+        }
+        hd {
+            dimension 'edition'
+            applicationIdSuffix '.hd'
+            versionNameSuffix '-hd'
+            resValue 'string', 'app_name', 'AETHER LANCE HD'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.shared
+        }
+        debug {
+            signingConfig signingConfigs.shared
+        }
+    }
+    sourceSets {
+        classic { assets.srcDirs += layout.buildDirectory.dir('generated/webassets/classic').get().asFile }
+        hd { assets.srcDirs += layout.buildDirectory.dir('generated/webassets/hd').get().asFile }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint {
+        abortOnError false
+    }
+}
+
+// Copy each edition's web build into its APK assets (served from https://appassets.androidplatform.net/ by MainActivity).
+editions.each { name, html ->
+    def cap = name.capitalize()
+    def copy = tasks.register("copyWebAssets${cap}", Copy) {
+        doFirst {
+            if (!html.exists()) {
+                throw new GradleException("Missing ${html}. Run `npm run build:single${name == 'hd' ? ':hd' : ''}` in aether-lance/ first (or ./build-apk.sh).")
+            }
+        }
+        from(html) { rename { 'index.html' } }
+        from(licensesDir) { into 'licenses' }
+        into layout.buildDirectory.dir("generated/webassets/${name}/www")
+    }
+    tasks.configureEach { t -> if (t.name ==~ /pre${cap}(Debug|Release)Build/) t.dependsOn copy }
+}
