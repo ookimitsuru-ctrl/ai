@@ -486,7 +486,7 @@ export class WorldView {
           break;
         case 'band': {
           // orange = danger zone (default); a band given another colour (e.g. G4) marks a SAFE zone, such as the gap
-          // the stage 5 boss leaves when its plates close (v1.1.1: the colour used to be ignored, so the safe gap
+          // the stage 5 boss leaves when its plates close (v1.2.0: the colour used to be ignored, so the safe gap
           // looked exactly like the press warnings in the same stage)
           const custom = t.color !== 'O5' && t.color in PAL;
           g.fillStyle = rgba((custom ? t.color : 'O4') as PalKey, 0.12 + k * 0.18);

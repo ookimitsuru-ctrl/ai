@@ -1,5 +1,5 @@
 // Respawn placement: in stage 5's vertical shaft the usual entry point (60, 135) is inside the shaft wall, which used
-// to kill the ship again as soon as its invulnerability ran out (v1.1.1 fix: World.entrySpot).
+// to kill the ship again as soon as its invulnerability ran out (v1.2.0 fix: World.entrySpot).
 import { describe, it, expect } from 'vitest';
 import '../../src/content/index';
 import { ALL_STAGES } from '../../src/content/stages/index';

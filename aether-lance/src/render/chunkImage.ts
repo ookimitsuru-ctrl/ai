@@ -1,6 +1,6 @@
 // Finished terrain chunks are handed to the GPU off the main thread (createImageBitmap) instead of putImageData into
 // a canvas: Chrome defers that transfer to the first drawImage, which then took 20-40 ms in the frame the chunk came
-// on screen (v1.1.1; the cause of the occasional dropped frames on the phone). A chunk that must be shown right away
+// on screen (v1.2.0; the cause of the occasional dropped frames on the phone). A chunk that must be shown right away
 // (nothing on screen for it yet) still goes through a canvas synchronously.
 import { makeCanvas, ctx2d } from './sprite';
 

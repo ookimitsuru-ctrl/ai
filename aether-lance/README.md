@@ -8,6 +8,7 @@
 - **2つの版があります。** ドット絵の「通常版」と、同じゲームを現代的な高解像度グラフィックで描き直した「HD 版」です（下記「HD 版について」）。
 - 設計書は [`docs/`](docs/README.md) にあります。実装上の補足は [`IMPLEMENTATION_NOTES.md`](IMPLEMENTATION_NOTES.md) にまとめました。
 - **v1.1 の変更:** 自機を新デザイン（KESTREL Mk.II）に変更、敵が途切れず出てくるように「つなぎ編隊」を追加、ボスと中ボスを倒しやすく調整（攻撃はそのまま）、RAY が敵に当たらなかった不具合を修正。詳しくは [`docs/12_implementation.md`](docs/12_implementation.md) の §3。
+- **v1.2.0（確定版）の変更:** 自動テストと実機テスト（Pixel 9 Pro Fold）で見つかった問題を修正。ステージ5の縦穴での復活直後の連続死、プレスの予告位置のずれ、ステージ1ボスのハッチに弾が届かない不具合、ステージ5ボスの安全地帯の表示色と予告時間、SEEKER の狙い、ボスごとの耐久の調整、実機での地形描画のコマ落ち。詳しくは §3.1。
 
 ---
 
@@ -17,8 +18,9 @@
 
 `aether-lance.html` は1つのファイルで完結しています。ダブルクリックしてブラウザで開くだけで遊べます。サーバーもインターネット接続もいりません（日本語のドットフォント DotGothic16 も、使う文字だけを埋め込んであります）。
 
-ファイルの入手方法は次の2つです。
+ファイルの入手方法は次の3つです。
 
+- **リポジトリから:** 通常版は [`dist/AetherLance.html`](../dist/AetherLance.html)、HD 版は [`dist/AetherLanceHD.html`](../dist/AetherLanceHD.html) です（v1.2.0 の確定版）。
 - **GitHub Actions から:** このリポジトリの Actions →「AETHER LANCE」ワークフローの実行結果 → Artifacts の `aether-lance-single-html` をダウンロードして展開します。
 - **自分でビルドする:** 下記「3. 開発」の手順で `npm run build:single` を実行すると、`dist-single/aether-lance.html` ができます。
 

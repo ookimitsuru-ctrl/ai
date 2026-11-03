@@ -5,7 +5,7 @@ Player-facing instructions are in `README.md`.
 
 ## Status
 
-Complete (v1.0.0). All MUST items and nearly all SHOULD items of the spec are implemented:
+Complete (v1.2.0; see "v1.1 changes" and "v1.2.0 changes" below). All MUST items and nearly all SHOULD items of the spec are implemented:
 
 - 6 stages, 6 midbosses and 6 bosses (THE CHOIR has 3 forms), loop 2, true ending, continues, checkpoints.
 - PULSE / FAN / RAY Lv1–5, GRAVITY BOMB / SEEKER, WISP drones in 3 formations, AEGIS, Lance Drive, rank, 4 difficulties.
@@ -137,7 +137,7 @@ Twelve shots cut on bar lines (150 BPM, 96 frames per bar), with the drive-layer
   It first checks that the checkout is not behind GitHub (stops with the `git pull` to run; `--allow-old` overrides)
   and prints the game's own `begin` line (version, build time `__BUILD__`, stages) so a stale install is obvious.
 
-## v1.1.1 changes (headless balance sweep)
+## v1.2.0 changes (headless balance sweep and phone test)
 
 A sweep with the look-ahead autopilot (every stage × PULSE / FAN / RAY × NORMAL / HARD, mortal, with the loadout
 a player normally has there) plus boss-fight timing runs found:
@@ -171,7 +171,9 @@ a player normally has there) plus boss-fight timing runs found:
   `putImageData`'d canvas cost another 20–40 ms. Chunks are now time-sliced jobs (2.5 ms per frame) painted ahead of
   the camera in both scroll directions, like the HD renderer, and finished chunks become `ImageBitmap`s off the main
   thread (`render/chunkImage.ts`, both editions). Frames over 12 ms from terrain: 8–25 per stage → 0–1.
-- Version 1.1.1 (v1.1.0 replays are rejected).
+- Phone test (Pixel 9 Pro Fold, Android 17, classic edition, 60 + 20 + 20 min): 60 fps (5th percentile 59.9),
+  no crashes, at most 37.9 °C; the game's numbers matched the headless sweep exactly (fixed-step logic).
+- Version 1.2.0 (replays from earlier versions are rejected).
 
 ## HD edition
 

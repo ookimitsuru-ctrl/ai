@@ -102,7 +102,7 @@ export class TerrainRenderer {
 
   /**
    * Paint one chunk. A whole chunk takes 4-35 ms, so it is a job that yields after each pass and every 32 rows:
-   * `draw` spreads it over frames ahead of the camera (v1.1.1; it used to paint up to two chunks in the frame a chunk
+   * `draw` spreads it over frames ahead of the camera (v1.2.0; it used to paint up to two chunks in the frame a chunk
    * came into view, which dropped frames on phones).
    */
   private *paint(cx: number, cy: number): Generator<void, ImageData, void> {

@@ -696,7 +696,7 @@ export class World {
         if (!s.target || !s.target.active || s.target.dead) s.target = this.nearestEnemy(s.x, s.y);
         if (s.target && s.age > 6) {
           // multi-part targets: home on the nearest part that can take damage, not on the body's centre (which on
-          // the stage 2 boss is the refracting chest crystal: seekers kept feeding its counter-laser, v1.1.1)
+          // the stage 2 boss is the refracting chest crystal: seekers kept feeding its counter-laser, v1.2.0)
           let gx = s.target.x, gy = s.target.y;
           if (s.target.parts) {
             let bd = 1e12;

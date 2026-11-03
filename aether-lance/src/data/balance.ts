@@ -66,7 +66,7 @@ export const DRIVE = {
 };
 
 /** Player damage multipliers against midbosses and bosses; their attacks are unchanged.
- *  v1.1 made every one ×3.6. v1.1.1 sets them per stage from measured fight lengths (headless sweeps): with the
+ *  v1.1 made every one ×3.6. v1.2.0 sets them per stage from measured fight lengths (headless sweeps): with the
  *  power a player normally has there (stage 1: Lv1–2 and one drone; from stage 3: Lv5, four drones and SEEKER)
  *  a midboss takes about 10–20 s and a boss about 40–80 s, and with a weakened mid-game loadout (Lv3, two drones,
  *  no sub weapon; tests/unit/bosses.test.ts) every one still falls within 75 % of its time limit.
@@ -76,7 +76,7 @@ export const BOSS_DMG = {
   midboss: [1, 7, 2.2, 3.8, 1, 2.4, 2.7],
   boss: [1, 6, 5.5, 3.6, 3.2, 1.2, 1.4],
   pulse: 1, fan: 1.8, ray: 1, other: 1,
-  // seekers home on the nearest damageable part (v1.1.1), so against a boss they count for less
+  // seekers home on the nearest damageable part (v1.2.0), so against a boss they count for less
   seeker: 0.5,
 };
 
