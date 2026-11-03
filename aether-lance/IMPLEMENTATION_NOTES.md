@@ -131,7 +131,8 @@ Twelve shots cut on bar lines (150 BPM, 96 frames per bar), with the drive-layer
   page errors (`JSERR`) to logcat under the tag `AetherLance`.
 - `scripts/device-test.py` (host side, stdlib Python + adb): installs the APK, starts the test, follows logcat, polls
   battery temperature and restarts the app if it dies, takes a screenshot every 5 minutes and, if a local LLM is
-  running (Ollama `/api/*` or OpenAI-compatible `/v1/*`), has a vision model check it; at the end it computes
+  running (Ollama `/api/*` or OpenAI-compatible `/v1/*`; `--llm` takes a URL or just a host name, whose usual ports are
+  probed; Qwen3 `<think>` blocks are stripped), has a vision model check it; at the end it computes
   per-difficulty/stage numbers and automatic findings and asks the LLM for a balance review → `report.md`.
   It first checks that the checkout is not behind GitHub (stops with the `git pull` to run; `--allow-old` overrides)
   and prints the game's own `begin` line (version, build time `__BUILD__`, stages) so a stale install is obvious.

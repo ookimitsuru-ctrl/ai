@@ -11,6 +11,7 @@ summary.json, events.jsonl, logcat.txt and the screenshots into the output folde
   python3 scripts/device-test.py                       # 60 minutes, classic edition, NORMAL and HARD
   python3 scripts/device-test.py --edition hd --minutes 30 --diff normal
   python3 scripts/device-test.py --llm http://localhost:1234 --model qwen2.5-vl-7b-instruct
+  python3 scripts/device-test.py --llm kapitsa --model qwen3.8-27b:8bit     # LLM on another machine on the LAN
 
 Needs Python 3.8+ and adb (Android platform-tools). Only the standard library is used.
 Phone: Developer options → USB debugging on, accept the computer's key, keep the phone unlocked.
@@ -136,13 +137,14 @@ def behind_origin():
 class LLM:
     """Ollama (/api/...) or an OpenAI-compatible server (/v1/...)."""
 
-    def __init__(self, base: str, model, timeout=600):
+    def __init__(self, base: str, model, timeout=900, vision=None, probe_timeout=5):
         self.base = base.rstrip('/')
         self.kind = None
         self.models = []
         self.model = model
         self.vision = False
         self.timeout = timeout
+        self.probe_timeout = probe_timeout
         try:
             tags = self._get('/api/tags')
             self.kind = 'ollama'
@@ -157,17 +159,29 @@ class LLM:
         if not self.models:
             self.kind = None
             return
+        self.missing = None
+        if self.model and self.model not in self.models:
+            # tolerate small differences in how the server names it (prefix / case / quantisation suffix)
+            def norm(x):
+                return re.sub(r'[^a-z0-9.]', '', x.lower())
+            want = norm(self.model)
+            near = [m for m in self.models if want in norm(m) or norm(m) in want]
+            if near:
+                self.model = near[0]
+            else:
+                self.missing = self.model
+                self.model = None
         if not self.model:
             vis = [m for m in self.models if any(h in m.lower() for h in VISION_HINTS)]
             self.model = (vis or self.models)[0]
-        self.vision = any(h in self.model.lower() for h in VISION_HINTS)
+        self.vision = vision if vision is not None else any(h in self.model.lower() for h in VISION_HINTS)
 
     @property
     def ok(self) -> bool:
         return self.kind is not None
 
     def _get(self, path):
-        with urllib.request.urlopen(self.base + path, timeout=5) as r:
+        with urllib.request.urlopen(self.base + path, timeout=self.probe_timeout) as r:
             return json.loads(r.read())
 
     def _post(self, path, body):
@@ -176,17 +190,44 @@ class LLM:
             return json.loads(r.read())
 
     def ask(self, prompt: str, image_png=None) -> str:
+        if 'qwen3' in self.model.lower():
+            prompt += '\n/no_think'  # Qwen3: answer directly instead of a long reasoning trace
         if self.kind == 'ollama':
             body = {'model': self.model, 'prompt': prompt, 'stream': False, 'options': {'temperature': 0.2}}
             if image_png is not None:
                 body['images'] = [base64.b64encode(image_png).decode()]
-            return self._post('/api/generate', body).get('response', '').strip()
+            return clean_answer(self._post('/api/generate', body).get('response', ''))
         content = prompt
         if image_png is not None:
             content = [{'type': 'text', 'text': prompt},
                        {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,' + base64.b64encode(image_png).decode()}}]
         body = {'model': self.model, 'messages': [{'role': 'user', 'content': content}], 'temperature': 0.2}
-        return self._post('/v1/chat/completions', body)['choices'][0]['message']['content'].strip()
+        return clean_answer(self._post('/v1/chat/completions', body)['choices'][0]['message']['content'] or '')
+
+
+def clean_answer(text: str) -> str:
+    """Drop a reasoning block (<think>...</think>, as Qwen3 and others emit) and surrounding blank space."""
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.S)
+    if '<think>' in text:  # unterminated: keep what follows the last tag, if anything
+        text = text.split('</think>')[-1] if '</think>' in text else ''
+    return text.strip()
+
+
+def find_llm(spec: str, model, vision=None):
+    """`spec` is a URL (http://host:port), a host:port or just a host name (e.g. kapitsa): then the usual ports of
+    Ollama (11434), LM Studio (1234), llama.cpp / MLX (8080), vLLM (8000) and others are tried, on host and host.local."""
+    if '://' in spec:
+        cands = [spec]
+    else:
+        host, _, port = spec.partition(':')
+        hosts = [host] if ('.' in host or host in ('localhost', '127.0.0.1')) else [host, host + '.local']
+        ports = [port] if port else ['11434', '1234', '8080', '8000', '5000', '5001']
+        cands = [f'http://{h}:{p}' for h in hosts for p in ports]
+    for base in cands:
+        llm = LLM(base, model, vision=vision, probe_timeout=2 if len(cands) > 1 else 5)
+        if llm.ok:
+            return llm, cands
+    return None, cands
 
 
 SHOT_PROMPT = """これは横スクロールシューティングゲーム「AETHER LANCE」をスマートフォンで自動プレイしている画面です（自機は左側の白い宇宙船、画面上部が HUD）。
@@ -331,8 +372,10 @@ def main():
     ap.add_argument('--stages', default='1-6', help='range and/or list: 1-6, 5, 1,5, 1-3,5')
     ap.add_argument('--speed', type=int, default=1, help='game speed 1..4 (1 = real time; keep 1 to measure fps)')
     ap.add_argument('--vol', type=int, default=3, help='master volume 0..10')
-    ap.add_argument('--llm', default='http://localhost:11434', help='local LLM server (Ollama default; LM Studio: http://localhost:1234)')
-    ap.add_argument('--model', help='model name (default: the first vision model found, else the first model)')
+    ap.add_argument('--llm', default=os.environ.get('AL_LLM', 'localhost:11434'),
+                    help='local LLM server: URL, host:port, or a host name such as kapitsa (common ports are tried); env AL_LLM')
+    ap.add_argument('--model', default=os.environ.get('AL_LLM_MODEL'), help='model name (default: the first vision model found, else the first model); env AL_LLM_MODEL')
+    ap.add_argument('--vision', action='store_true', help='the model reads images (send screenshots even if its name does not say so)')
     ap.add_argument('--no-llm', action='store_true')
     ap.add_argument('--shot-every', type=int, default=300, help='seconds between screenshots (0 = none)')
     ap.add_argument('--serial', help='adb serial when several devices are connected')
@@ -376,12 +419,13 @@ def main():
 
     llm = None
     if not args.no_llm:
-        llm = LLM(args.llm, args.model)
-        if llm.ok:
-            say(f'ローカル LLM: {llm.kind} {llm.model}' + ('（画像も確認）' if llm.vision else '（文字のみ。画像の確認は省略）'))
+        llm, tried = find_llm(args.llm, args.model, vision=True if args.vision else None)
+        if llm:
+            if llm.missing:
+                say(f'モデル「{llm.missing}」は見つかりません。代わりに {llm.model} を使います。使えるモデル: {", ".join(llm.models)}')
+            say(f'ローカル LLM: {llm.base} {llm.kind} {llm.model}' + ('（画像も確認）' if llm.vision else '（文字のみ。画像も見られるモデルなら --vision）'))
         else:
-            say(f'ローカル LLM に接続できません（{args.llm}）。数値の集計だけ行います。')
-            llm = None
+            say(f'ローカル LLM に接続できません（{", ".join(tried[:4])}{" ほか" if len(tried) > 4 else ""}）。数値の集計だけ行います。')
 
     # start the test
     q = f'autotest={args.minutes:g}&diff={args.diff}&stages={args.stages}&speed={args.speed}&vol={args.vol}'
