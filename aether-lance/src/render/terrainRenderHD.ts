@@ -1,12 +1,12 @@
 // HD edition terrain: the per-pixel material map is resampled into smooth contours (bilinear occupancy, anti-aliased
 // edge), lit from a continuous distance-field normal, and textured with the same theme painters plus soft shading
 // and fine grain. Chunks are painted RS× in time-sliced jobs, ahead of the camera, so streaming never stalls a frame.
-import { makeCanvas, ctx2d, type Canvas } from './sprite';
 import { PAL, type PalKey, hexToRgb } from './palette';
 import { MAT, CW, CHK, type Terrain } from '../game/terrain';
 import { RS } from '../core/hd';
 import type { Painter, PaintInfo } from './terrainRender';
 import { THEMES_HD, type ShaderHD, type SurfHD } from './terrainThemesHD';
+import { finishChunk, newEntry, needsJob, dropEntry, type ChunkEntry } from './chunkImage';
 
 const P = 7;
 
@@ -23,7 +23,7 @@ function rgbKey(k: PalKey): [number, number, number] {
   return c;
 }
 
-interface Entry { c: Canvas | null; ver: number; used: number; job: Generator<void, Canvas, void> | null; jobVer: number }
+type Entry = ChunkEntry;
 
 export class TerrainRendererHD {
   private cache = new Map<number, Entry>();
@@ -35,7 +35,7 @@ export class TerrainRendererHD {
   }
 
   /** Paint one chunk; yields every few rows so the work can be spread over frames. */
-  private *paint(cx: number, cy: number): Generator<void, Canvas, void> {
+  private *paint(cx: number, cy: number): Generator<void, ImageData, void> {
     const K = this.K;
     const W = CW + P * 2, H = CHK + P * 2;
     const t = this.t;
@@ -60,9 +60,7 @@ export class TerrainRendererHD {
     yield;
 
     const OW = CW * K, OH = CHK * K;
-    const c = makeCanvas(OW, OH);
-    const g = ctx2d(c);
-    const img = g.createImageData(OW, OH);
+    const img = new ImageData(OW, OH);
     const px = img.data;
     const info: PaintInfo = { x: 0, y: 0, mat: 0, d: 0, ax: 0, ay: 0, lit: 0 };
     const surf: SurfHD = { x: 0, y: 0, mat: 0, d: 0, ax: 0, ay: 0, lit: 0 };
@@ -116,8 +114,7 @@ export class TerrainRendererHD {
       }
       if ((Y & 31) === 31) yield;
     }
-    g.putImageData(img, 0, 0);
-    return c;
+    return img;
   }
 
   private key(cx: number, cy: number): number { return (cy + 512) * 8192 + cx; }
@@ -128,7 +125,7 @@ export class TerrainRendererHD {
     const t0 = performance.now();
     for (;;) {
       const r = e.job.next();
-      if (r.done) { e.c = r.value; e.ver = e.jobVer; e.job = null; return true; }
+      if (r.done) { finishChunk(e, r.value, budget === Infinity); return true; }
       if (performance.now() - t0 > budget) return false;
     }
   }
@@ -138,8 +135,8 @@ export class TerrainRendererHD {
     const k = this.key(cx, cy);
     const ver = this.t.version(cx, cy);
     let e = this.cache.get(k);
-    if (!e) { e = { c: null, ver: -1, used: this.frame, job: null, jobVer: -1 }; this.cache.set(k, e); }
-    if (e.ver !== ver && (!e.job || e.jobVer !== ver)) { e.job = this.paint(cx, cy); e.jobVer = ver; }
+    if (!e) { e = newEntry(this.frame); this.cache.set(k, e); }
+    if (needsJob(e, ver)) { e.job = this.paint(cx, cy); e.jobVer = ver; }
     return e;
   }
 
@@ -169,7 +166,7 @@ export class TerrainRendererHD {
       if (e.job) { const t0 = performance.now(); this.run(e, budgetMs - spent); spent += performance.now() - t0; }
     }
     if (this.cache.size > 18) {
-      for (const [k, v] of this.cache) if (this.frame - v.used > 90) this.cache.delete(k);
+      for (const [k, v] of this.cache) if (this.frame - v.used > 90) { dropEntry(v); this.cache.delete(k); }
     }
   }
 

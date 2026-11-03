@@ -159,6 +159,13 @@ a player normally has there) plus boss-fight timing runs found:
   first midboss escaped with PULSE Lv1, FAN timed out on the boss) while the late bosses melted in 4–15 s at full
   power. Multipliers are now set so a midboss takes about 10–20 s and a boss about 40–80 s with the usual power, and
   `bosses.test.ts` (Lv3, two drones, no sub weapon) still beats every one well within its time limit.
+- **SEEKER vs bosses ×0.5** (`BOSS_DMG.seeker`): homing on weak points made it the dominant boss weapon (the stage 2
+  boss fell in 11–19 s, faster than the stage 1 boss).
+- **Dropped frames on the phone (terrain streaming).** The classic renderer painted whole 256×256 terrain chunks (4–35
+  ms each, up to two per frame) in the frame they came into view, and the first `drawImage` of a freshly
+  `putImageData`'d canvas cost another 20–40 ms. Chunks are now time-sliced jobs (2.5 ms per frame) painted ahead of
+  the camera in both scroll directions, like the HD renderer, and finished chunks become `ImageBitmap`s off the main
+  thread (`render/chunkImage.ts`, both editions). Frames over 12 ms from terrain: 8–25 per stage → 0–1.
 - Version 1.1.1 (v1.1.0 replays are rejected).
 
 ## HD edition

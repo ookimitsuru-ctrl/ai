@@ -76,6 +76,8 @@ export const BOSS_DMG = {
   midboss: [1, 7, 2.2, 3.8, 1, 2.4, 2.7],
   boss: [1, 6, 5.5, 3.6, 3.2, 1.2, 1.4],
   pulse: 1, fan: 1.8, ray: 1, other: 1,
+  // seekers home on the nearest damageable part (v1.1.1), so against a boss they count for less
+  seeker: 0.5,
 };
 
 /** Filler waves (v1.1): keep at least `minAlive` enemies around between scripted waves. */

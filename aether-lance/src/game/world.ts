@@ -882,7 +882,7 @@ export class World {
 
   /** Apply damage to an enemy (part-aware). Returns 'hit' | 'armor' | 'none'. */
   /** weapon behind the current damageEnemy call (set by the shot code), for the boss damage multiplier */
-  dmgSrc: 'pulse' | 'fan' | 'ray' | 'other' = 'other';
+  dmgSrc: 'pulse' | 'fan' | 'ray' | 'seeker' | 'other' = 'other';
 
   damageEnemy(e: Enemy, part: Part | null, dmg: number, fromX: number): 'hit' | 'armor' | 'none' {
     if (e.dead || !e.active) return 'none';
@@ -1128,7 +1128,7 @@ export class World {
         }
         const target = this.shotTarget(s, e);
         if (!target) continue;
-        this.dmgSrc = s.kind === SHOT_PULSE ? 'pulse' : s.kind === SHOT_FAN ? 'fan' : 'other';
+        this.dmgSrc = s.kind === SHOT_PULSE ? 'pulse' : s.kind === SHOT_FAN ? 'fan' : s.kind === SHOT_SEEKER ? 'seeker' : 'other';
         const res = this.damageEnemy(e, target === true ? null : target, s.dmg, s.x - s.vx * 3);
         this.dmgSrc = 'other';
         s.active = false;
