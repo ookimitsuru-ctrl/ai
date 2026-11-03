@@ -104,6 +104,34 @@ def pick_device(adb: Adb) -> str:
     return devs[0]
 
 
+def parse_stages(spec: str):
+    out = []
+    for part in spec.split(','):
+        bits = part.split('-')
+        try:
+            a = int(bits[0]); b = int(bits[1]) if len(bits) > 1 and bits[1] else a
+        except ValueError:
+            continue
+        out += [s for s in range(a, b + 1) if 1 <= s <= 6 and s not in out]
+    return out or [1, 2, 3, 4, 5, 6]
+
+
+def behind_origin():
+    """Commits the local checkout is behind GitHub (None if it cannot tell)."""
+    git = shutil.which('git')
+    if not git or not os.path.isdir(os.path.join(REPO, '.git')):
+        return None, ''
+    try:
+        branch = subprocess.run([git, '-C', REPO, 'rev-parse', '--abbrev-ref', 'HEAD'], capture_output=True, text=True, timeout=10).stdout.strip()
+        if not branch or branch == 'HEAD':
+            return None, ''
+        subprocess.run([git, '-C', REPO, 'fetch', '-q', 'origin', branch], capture_output=True, timeout=60)
+        n = subprocess.run([git, '-C', REPO, 'rev-list', '--count', f'HEAD..origin/{branch}'], capture_output=True, text=True, timeout=10).stdout.strip()
+        return (int(n) if n.isdigit() else None), branch
+    except Exception:  # noqa: BLE001
+        return None, ''
+
+
 # ---------------------------------------------------------------- local LLM
 class LLM:
     """Ollama (/api/...) or an OpenAI-compatible server (/v1/...)."""
@@ -310,7 +338,15 @@ def main():
     ap.add_argument('--serial', help='adb serial when several devices are connected')
     ap.add_argument('--no-install', action='store_true')
     ap.add_argument('--out', help='output folder (default: device-test-<date> next to this project)')
+    ap.add_argument('--allow-old', action='store_true', help='run even if this checkout is behind GitHub')
     args = ap.parse_args()
+
+    n_behind, branch = behind_origin()
+    if n_behind:
+        say(f'このフォルダは GitHub の最新版より {n_behind} 件古いままです（APK とこのスクリプトも古い版）。先に次を実行してください:')
+        print(f'    git pull origin {branch}', flush=True)
+        if not args.allow_old:
+            sys.exit('（古い版のまま測るときは --allow-old を付けてください）')
 
     out = args.out or os.path.join(PROJ, 'device-test-' + dt.datetime.now().strftime('%Y%m%d-%H%M'))
     os.makedirs(os.path.join(out, 'shots'), exist_ok=True)
@@ -385,7 +421,11 @@ def main():
                 evf.flush()
                 ev = e.get('ev')
                 d = names.get(e.get('diff'), e.get('diff'))
-                if ev == 'start':
+                if ev == 'begin':
+                    say(f"ゲーム側: {e.get('version')} ビルド {e.get('build', '不明（古い版）')} / ステージ {','.join(map(str, e.get('stages', [])))} / 難易度 {','.join(e.get('diffs', []))}")
+                    if e.get('stages') and e['stages'] != parse_stages(args.stages):
+                        say('  ! 指定したステージと違います。スマホに入っている APK が古い可能性があります（git pull してからやり直してください）')
+                elif ev == 'start':
                     say(f"▶ ST{e['stage']} {d} {e['weapon'].upper()} Lv{e['lv']} ドローン{e['drones']}")
                 elif ev == 'death':
                     say(f"  ✕ 死亡 ST{e['stage']} {e['sec']}秒 原因={e['cause']} ({e['phase']}) 残機{e['lives']}")

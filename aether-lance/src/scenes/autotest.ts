@@ -26,6 +26,9 @@ import type { World, WorldEvent } from '../game/world';
 import type { PlayerLoadout } from '../game/entities';
 import { HD } from '../core/hd';
 
+declare const __BUILD__: string;
+const BUILD = typeof __BUILD__ === 'string' ? __BUILD__ : 'dev';
+
 interface Agg { attempts: number; clears: number; deaths: number; continues: number; gameovers: number; causes: Record<string, number>; boss: { n: number; defeated: number; sec: number }; midboss: { n: number; defeated: number; sec: number }; stageSec: number }
 
 const WEAPONS = ['pulse', 'fan', 'ray'] as const;
@@ -201,7 +204,7 @@ export function startAutotest(params: URLSearchParams): void {
   if (vol !== null) { audio.vol = { master: Math.max(0, Math.min(10, Number(vol))), bgm: 7, sfx: 6 }; audio.applyVolumes(); }
   audio.unlock();
   const t = new Autotest(minutes, diffs.length ? diffs : ['normal'], stages.length ? stages : [1, 2, 3, 4, 5, 6]);
-  log({ ev: 'begin', minutes, diffs, stages, speed, version: VERSION, hd: HD, ua: navigator.userAgent, screen: `${screen.width}x${screen.height}@${devicePixelRatio}` });
+  log({ ev: 'begin', minutes, diffs, stages, speed, version: VERSION, build: BUILD, hd: HD, ua: navigator.userAgent, screen: `${screen.width}x${screen.height}@${devicePixelRatio}` });
   // the game pauses itself while the page is hidden (screen off, app switch, fold): note it so a gap in the log is explained
   document.addEventListener('visibilitychange', () => log({ ev: 'visibility', state: document.visibilityState }));
   scenes.replaceNow(t.next());

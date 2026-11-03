@@ -126,7 +126,9 @@ export function hiScore(diff: Difficulty): number {
 
 export function vibrate(ms: number): void {
   if (!save.data.settings.vibration) return;
-  try { navigator.vibrate?.(ms); } catch { /* */ }
+  // the browser refuses (and logs an error) until the page has had a tap: skip it before that (e.g. attract demo, autotest)
+  const ua = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation;
+  if (!ua || ua.hasBeenActive) { try { navigator.vibrate?.(ms); } catch { /* */ } }
   try {
     const pad = input.findPad() as (Gamepad & { vibrationActuator?: { playEffect(t: string, o: object): void } }) | null;
     pad?.vibrationActuator?.playEffect('dual-rumble', { duration: ms * 2, strongMagnitude: 0.6, weakMagnitude: 0.4 });
