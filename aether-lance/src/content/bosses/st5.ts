@@ -218,7 +218,9 @@ defEnemy({
     while (core.hp > core.maxHp * 0.3) {
       const gy = gaps[gi % 4] === -1 ? Math.max(50, Math.min(220, c.p.alive ? c.p.y : 135)) : gaps[gi % 4]!;
       gi++;
-      const tele = Math.max(60, c.w.cfg.teleMin);
+      // long enough to reach the gap from the far edge (up to ~150 px) even at the slowest speed (1.6 px/frame);
+      // it was 60 frames, which only the default speed could just make (v1.1.1)
+      const tele = Math.max(c.loop2 ? 70 : 90, c.w.cfg.teleMin);
       c.telegraph('band', 0, gy - 32, e.x - 40, gy + 32, tele, 1, 'G4');
       c.telegraph('line', 0, gy, e.x - 40, gy, tele, 1, 'Y4');
       // ring while open

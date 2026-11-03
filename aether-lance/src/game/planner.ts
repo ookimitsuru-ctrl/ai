@@ -24,6 +24,8 @@ interface Ctx {
   teles: Tele[];
   /** flame reach around welders that are sparking and the stage 5 midboss claw */
   flames: { x: number; y: number; r: number }[];
+  /** a safe-zone warning is on screen */
+  safeNow: boolean;
   spd: number;
 }
 
@@ -119,6 +121,10 @@ function danger(c: Ctx, x: number, y: number, k: number): number {
     if (hit) cost += HIT * 0.5;
   }
   for (const f of c.flames) if (dist2(hx, hy, f.x, f.y) < f.r * f.r) cost += HIT * 0.4;
+  if (safeMem && !c.safeNow && w.frame < safeMem.until && hx >= safeMem.x0 && hx <= safeMem.x1) {
+    const m = PLAYER.hitR + 4;
+    if (hy < safeMem.y0 + m || hy > safeMem.y1 - m) cost += HIT * 0.5;
+  }
   return cost;
 }
 
@@ -152,6 +158,8 @@ function preferred(w: World): { x: number; y: number } {
 }
 
 let lastDir = 0;
+/** the last safe-zone band, remembered while the plates close after its warning has ended */
+let safeMem: { x0: number; x1: number; y0: number; y1: number; until: number } | null = null;
 
 export function plannerInput(w: World): InputFrame {
   const p = w.player;
@@ -165,12 +173,18 @@ export function plannerInput(w: World): InputFrame {
     hazards: w.hazards.items.filter((h) => h.active),
     teles: w.teles.items.filter((t) => t.active),
     flames: [],
+    safeNow: false,
     spd: PLAYER.speeds[p.speedLv - 1]!,
   };
   for (const e of w.enemies.items) {
     if (!e.active || e.dead) continue;
     if (e.def.id === 'welder' && e.v.spark) c.flames.push({ x: e.x, y: e.y, r: 56 });
     if (e.parts) for (const pt of e.parts) if (pt.id === 'claw' && pt.alive) c.flames.push({ x: pt.x, y: pt.y, r: 74 });
+  }
+  for (const t of c.teles) {
+    if (t.kind !== 'band' || t.color === 'O5') continue;
+    c.safeNow = true;
+    safeMem = { x0: Math.min(t.x1, t.x2), x1: Math.max(t.x1, t.x2), y0: Math.min(t.y1, t.y2), y1: Math.max(t.y1, t.y2), until: w.frame + t.life + 100 };
   }
   const B = PLAYER.bounds;
   const pref = preferred(w);
