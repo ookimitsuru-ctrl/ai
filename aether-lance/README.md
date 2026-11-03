@@ -203,7 +203,7 @@ Node.js 22 以上を推奨します（Vite 8 の要件）。実行時の依存�
 python3 scripts/device-test.py --minutes 60
 ```
 
-ゲームの自動テストモード（URL の `?autotest=<分>`）では、先読み型の自動操縦（無敵ではない）が各ステージを「そのステージに普通に着いたときの装備」で順に遊び、難易度（既定は NORMAL と HARD）と武器を入れ替えながら、指定の時間だけ挑戦を続けます。死亡（原因つき）、中ボスとボスの結果と時間、クリア、実機の FPS を記録し、スクリプトはそれを logcat から受け取って画面に流します。数分おきに画面を撮り、ローカル LLM（Ollama、または LM Studio などの OpenAI 互換サーバー）が動いていれば、画面の見やすさを確認させ、最後にバランスの所見もまとめさせます。結果は `device-test-<日時>/report.md`（ほかに `summary.json`、`events.jsonl`、`logcat.txt`、`shots/`）に出ます。主なオプション: `--edition hd`、`--diff normal`、`--stages 3-6`、`--llm http://localhost:1234`、`--model <名前>`、`--no-llm`。USB デバッグを ON にし、スマートフォンのロックを解除しておいてください。パソコンには adb（Android platform-tools）が必要です。ブラウザでも `?autotest=10&diff=normal` のように付けて開けば同じテストが動き、結果は開発者ツールのコンソールに `ALTEST` の行として出ます。
+ゲームの自動テストモード（URL の `?autotest=<分>`）では、先読み型の自動操縦（無敵ではない）が各ステージを「そのステージに普通に着いたときの装備」で順に遊び、難易度（既定は NORMAL と HARD）と武器を入れ替えながら、指定の時間だけ挑戦を続けます。死亡（原因つき）、中ボスとボスの結果と時間、クリア、実機の FPS を記録し、スクリプトはそれを logcat から受け取って画面に流します。数分おきに画面を撮り、ローカル LLM（Ollama、または LM Studio などの OpenAI 互換サーバー）が動いていれば、画面の見やすさを確認させ、最後にバランスの所見もまとめさせます。結果は `device-test-<日時>/report.md`（ほかに `summary.json`、`events.jsonl`、`logcat.txt`、`shots/`）に出ます。主なオプション: `--edition hd`、`--diff normal`、`--stages 3-6`（`1,5` のような列挙も可）、`--llm http://localhost:1234`、`--model <名前>`、`--no-llm`。USB デバッグを ON にし、スマートフォンのロックを解除しておいてください。パソコンには adb（Android platform-tools）が必要です。ブラウザでも `?autotest=10&diff=normal` のように付けて開けば同じテストが動き、結果は開発者ツールのコンソールに `ALTEST` の行として出ます。
 
 **デバッグモード:** URL に `?debug=1` を付けて開くと、デバッグ表示とデバッグキーが使えます。
 

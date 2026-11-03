@@ -10,7 +10,8 @@
 //   gameover{stage, sec, deaths}
 //   fps     {avg, min, p5, stage}        every 30 s of real time
 //   done    {minutes, attempts, perStage: {...}}
-// Options: diff=normal,hard (comma list, cycled per pass), speed=1..4 (game speed), stages=1-6, vol=0..10.
+// Options: diff=normal,hard (comma list, cycled per pass), speed=1..4 (game speed), stages=1-6 (or 1,5 / 1-3,5), vol=0..10.
+//   visibility {state}                   when the page is hidden / shown (the game pauses while hidden)
 import { scenes, type Scene } from '../core/scene';
 import { save, type Difficulty } from '../core/save';
 import { renderer } from '../render/renderer';
@@ -188,9 +189,12 @@ class AutotestResults implements Scene {
 export function startAutotest(params: URLSearchParams): void {
   const minutes = Math.max(1, Number(params.get('autotest')) || 60);
   const diffs = (params.get('diff') ?? 'normal,hard').split(',').filter((d): d is Difficulty => ['easy', 'normal', 'hard', 'ordeal'].includes(d));
-  const st = (params.get('stages') ?? '1-6').split('-').map(Number);
+  // stages: a range and/or list, e.g. 1-6, 5, 1,5 or 1-3,5
   const stages: number[] = [];
-  for (let s = st[0] ?? 1; s <= (st[1] ?? st[0] ?? 6); s++) if (s >= 1 && s <= 6) stages.push(s);
+  for (const part of (params.get('stages') ?? '1-6').split(',')) {
+    const [a, b] = part.split('-').map(Number);
+    for (let s = a ?? 1; s <= (b ?? a ?? 6); s++) if (s >= 1 && s <= 6 && !stages.includes(s)) stages.push(s);
+  }
   const speed = Math.max(1, Math.min(4, Number(params.get('speed')) || 1));
   (save.data.settings as { gameSpeed: number }).gameSpeed = Math.round(speed * 100); // not persisted: spectated runs never save
   const vol = params.get('vol');
@@ -198,5 +202,7 @@ export function startAutotest(params: URLSearchParams): void {
   audio.unlock();
   const t = new Autotest(minutes, diffs.length ? diffs : ['normal'], stages.length ? stages : [1, 2, 3, 4, 5, 6]);
   log({ ev: 'begin', minutes, diffs, stages, speed, version: VERSION, hd: HD, ua: navigator.userAgent, screen: `${screen.width}x${screen.height}@${devicePixelRatio}` });
+  // the game pauses itself while the page is hidden (screen off, app switch, fold): note it so a gap in the log is explained
+  document.addEventListener('visibilitychange', () => log({ ev: 'visibility', state: document.visibilityState }));
   scenes.replaceNow(t.next());
 }

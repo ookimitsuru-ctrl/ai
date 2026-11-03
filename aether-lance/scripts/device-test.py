@@ -187,6 +187,7 @@ causes=死亡原因の内訳, boss / midboss = 撃破数/出現数と平均時�
 def summarize(events, extra):
     agg = {}
     fps = []
+    open_key = None  # attempt in progress (started, not yet cleared / given up)
     for e in events:
         ev = e.get('ev')
         k = f"{e.get('diff', '?')}/{e.get('stage', '?')}"
@@ -195,16 +196,19 @@ def summarize(events, extra):
                                    'boss': {'n': 0, 'defeated': 0, 'sec': []}, 'midboss': {'n': 0, 'defeated': 0, 'sec': []}, 'clearSec': [],
                                    'weapons': {}})
             if ev == 'start':
+                open_key = k
                 a['attempts'] += 1
                 a['weapons'][e.get('weapon')] = a['weapons'].get(e.get('weapon'), 0) + 1
             elif ev == 'death':
                 a['deaths'] += 1
                 a['causes'][e.get('cause', '?')] = a['causes'].get(e.get('cause', '?'), 0) + 1
             elif ev == 'clear':
+                open_key = None
                 a['clears'] += 1
                 a['continues'] += e.get('continues', 0)
                 a['clearSec'].append(e.get('sec', 0))
             elif ev == 'gameover':
+                open_key = None
                 a['gameovers'] += 1
             elif ev in ('boss', 'midboss'):
                 b = a[ev]
@@ -213,13 +217,20 @@ def summarize(events, extra):
                 b['sec'].append(e.get('sec', 0))
         elif ev == 'fps':
             fps.append(e)
+    # the attempt running when the time was up is unfinished: leave it out of the clear rate
+    if open_key and open_key in agg:
+        agg[open_key]['attempts'] -= 1
+        agg[open_key]['unfinished'] = 1
     flags = []
+    hidden = [e for e in events if e.get('ev') == 'visibility' and e.get('state') == 'hidden']
+    if hidden:
+        flags.append(f'途中でアプリが {len(hidden)} 回裏に回った（画面消灯・アプリ切り替え・本体の開閉など）。その間ゲームは一時停止')
     for k, a in sorted(agg.items()):
         diff, st = k.split('/')
         n = max(1, a['attempts'])
         rate = a['clears'] / n
         dpa = a['deaths'] / n
-        if diff in ('easy', 'normal') and a['attempts'] >= 1 and rate < 0.5:
+        if diff in ('easy', 'normal') and a['attempts'] >= 1 and rate < 0.5 and a['clears'] + a['gameovers'] > 0:
             flags.append(f'{k}: クリア率 {rate:.0%}（{a["clears"]}/{a["attempts"]}）。{diff.upper()} にしては難しすぎる可能性')
         if diff == 'normal' and dpa > 2.5:
             flags.append(f'{k}: 1回の挑戦あたり平均 {dpa:.1f} 回死亡')
@@ -289,7 +300,7 @@ def main():
     ap.add_argument('--edition', choices=['classic', 'hd'], default='classic')
     ap.add_argument('--minutes', type=float, default=60)
     ap.add_argument('--diff', default='normal,hard', help='comma list: easy,normal,hard,ordeal (cycled per pass)')
-    ap.add_argument('--stages', default='1-6')
+    ap.add_argument('--stages', default='1-6', help='range and/or list: 1-6, 5, 1,5, 1-3,5')
     ap.add_argument('--speed', type=int, default=1, help='game speed 1..4 (1 = real time; keep 1 to measure fps)')
     ap.add_argument('--vol', type=int, default=3, help='master volume 0..10')
     ap.add_argument('--llm', default='http://localhost:11434', help='local LLM server (Ollama default; LM Studio: http://localhost:1234)')
@@ -386,6 +397,8 @@ def main():
                     say(f"  ■ ST{e['stage']} 打ち切り（3回コンティニューしても進めず）")
                 elif ev == 'fps':
                     say(f"  fps 平均{e['avg']} 下位5%{e['p5']} 最低{e['min']} (ST{e['stage']})")
+                elif ev == 'visibility':
+                    say('  ‖ アプリが裏に回りました（一時停止）' if e.get('state') == 'hidden' else '  ▷ アプリが前面に戻りました（再開）')
                 elif ev == 'done':
                     state['done'] = True
             elif 'JSERR' in line:

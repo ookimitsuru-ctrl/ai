@@ -118,8 +118,9 @@ Twelve shots cut on bar lines (150 BPM, 96 frames per bar), with the drive-layer
 - `?autotest=<minutes>` (`scenes/autotest.ts`, started from `main.ts`): the look-ahead autopilot (`game/planner.ts`,
   mortal) plays each stage in turn with the loadout a player normally has there (docs/03 §5.7), cycling the
   difficulties (`diff=normal,hard`) and the three main weapons, continuing up to three times per attempt. Options:
-  `stages=1-6`, `speed=1..4`, `vol=0..10`. Each observation is one console line `ALTEST {json}`
-  (begin / start / death with cause / midboss / boss / clear / gameover / fps every 30 s / done); a results table is
+  `stages=1-6` (or a list such as `1,5`), `speed=1..4`, `vol=0..10`. Page hide / show is logged as `visibility`
+  (the game pauses while hidden). Each observation is one console line `ALTEST {json}`
+  (begin / start / death with cause / midboss / boss / clear / gameover / fps every 30 s / visibility / done); a results table is
   shown on screen at the end. Death causes come from `World.hitSrc` (`bullet:<kind>`, `hazard:<kind>`,
   `contact:<enemy>`, `terrain`, `crush`).
 - `game/planner.ts`: each frame it tries the 9 stick directions for 6 frames followed by each of the 9 again up to
