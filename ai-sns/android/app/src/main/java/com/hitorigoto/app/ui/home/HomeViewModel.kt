@@ -7,6 +7,7 @@ import com.hitorigoto.app.data.Me
 import com.hitorigoto.app.data.NotificationView
 import com.hitorigoto.app.data.PersonaSlot
 import com.hitorigoto.app.data.PostView
+import com.hitorigoto.app.data.Reaction
 import com.hitorigoto.app.data.SessionStore
 import com.hitorigoto.app.data.SnsApi
 import com.hitorigoto.app.ui.errorMessage
@@ -30,6 +31,8 @@ data class HomeUiState(
     val notifications: List<NotificationView> = emptyList(),
     val unreadCount: Int = 0,
     val sending: Boolean = false,
+    /** スレッドに送信中 */
+    val threadSending: Boolean = false,
     /** 直近の取得に失敗している(つながっていない) */
     val offline: Boolean = false,
     /** 操作の結果として一度だけ見せるメッセージ(スナックバー) */
@@ -106,6 +109,48 @@ class HomeViewModel(
             } catch (e: Exception) {
                 if (e is ApiException && e.isUnauthorized) store.logout()
                 _state.update { it.copy(sending = false, message = errorMessage(e)) }
+            }
+        }
+    }
+
+    /** フォロワーの返信にいいね(すでにいいね済みなら取り消し)。まず画面に反映し、サーバーが失敗したら元に戻す */
+    fun toggleLike(reaction: Reaction) {
+        val want = !reaction.liked
+        setLikedLocally(reaction.id, want)
+        viewModelScope.launch {
+            try {
+                api.setLike(reaction.id, want)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                setLikedLocally(reaction.id, !want)
+                if (e is ApiException && e.isUnauthorized) store.logout()
+                _state.update { it.copy(message = errorMessage(e)) }
+            }
+        }
+    }
+
+    private fun setLikedLocally(reactionId: String, liked: Boolean) = _state.update { s ->
+        s.copy(posts = s.posts.map { p -> p.copy(reactions = p.reactions.map { if (it.id == reactionId) it.copy(liked = liked) else it }) })
+    }
+
+    /** スレッドに発言する。成功したら onSuccess(入力欄を空にする)。フォロワーの返事は、あとで取得して現れる */
+    fun sendThreadMessage(reaction: Reaction, text: String, onSuccess: () -> Unit) {
+        if (_state.value.threadSending || reaction.replying || !isPostable(text)) return
+        _state.update { it.copy(threadSending = true) }
+        viewModelScope.launch {
+            try {
+                api.sendThreadMessage(reaction.id, text.trim())
+                onSuccess()
+                _state.update { it.copy(threadSending = false) }
+                refresh()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (e is ApiException && e.isUnauthorized) store.logout()
+                _state.update { it.copy(threadSending = false, message = errorMessage(e)) }
+                // 返事待ち(409)などは、サーバーの状態に合わせ直す
+                if (e is ApiException && e.code == "reply_pending") refresh()
             }
         }
     }

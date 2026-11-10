@@ -49,7 +49,10 @@ fun errorMessage(e: Throwable): String = when {
     e is ApiException && e.code == "invite_required" -> "招待コードを入力してください"
     e is ApiException && e.code == "invalid_nickname" -> "ニックネームは1〜20文字にしてください"
     e is ApiException && e.code == "daily_limit" ->
-        "今日の投稿上限(${e.limit ?: "?"}回)に達しました。明日またつぶやいてね"
+        "今日の上限(${e.limit ?: "?"}回)に達しました。明日またね"
+    e is ApiException && e.code == "reply_pending" -> "返事を待っています。少し待ってから送ってね"
+    e is ApiException && e.code == "thread_limit" -> "この会話は、これ以上続けられません(${e.limit ?: 20}回まで)"
+    e is ApiException && e.code == "not_found" -> "この返信は見つかりませんでした"
     e is ApiException && e.code == "invalid_length" -> "つぶやきは${e.max ?: 140}文字までです"
     e is ApiException && e.status == 401 -> "ログインが無効になりました"
     e is ApiException -> "うまくいきませんでした(${e.status})"

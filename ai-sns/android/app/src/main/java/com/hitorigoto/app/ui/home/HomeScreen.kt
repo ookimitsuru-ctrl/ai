@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.hitorigoto.app.data.Reaction
 import com.hitorigoto.app.ui.interactionsWith
 
 enum class Tab(val label: String, val icon: ImageVector) {
@@ -54,6 +55,8 @@ fun HomeScreen(
     serverUrl: String,
     nowMs: Long,
     onPost: (String, () -> Unit) -> Unit,
+    onToggleLike: (Reaction) -> Unit,
+    onSendThreadMessage: (Reaction, String, () -> Unit) -> Unit,
     onMarkAllRead: () -> Unit,
     onSaveServerUrl: (String) -> Unit,
     onDeleteAccount: () -> Unit,
@@ -62,6 +65,8 @@ fun HomeScreen(
 ) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     var openPersonaId by rememberSaveable { mutableStateOf<String?>(null) }
+    // 開いている会話(つぶやきID と 返信ID)。画面のたびに最新の状態から引き直すので、返事が届けば自動で現れる
+    var openThread by rememberSaveable { mutableStateOf<Pair<String, String>?>(null) }
     val snackbar = remember { SnackbarHostState() }
 
     LaunchedEffect(state.message) {
@@ -74,7 +79,9 @@ fun HomeScreen(
     LaunchedEffect(tab, state.unreadCount) {
         if (tab == Tab.Notifications && state.unreadCount > 0) onMarkAllRead()
     }
-    BackHandler(enabled = openPersonaId != null) { openPersonaId = null }
+    BackHandler(enabled = openPersonaId != null || openThread != null) {
+        if (openThread != null) openThread = null else openPersonaId = null
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -86,6 +93,7 @@ fun HomeScreen(
                         onClick = {
                             tab = t
                             openPersonaId = null
+                            openThread = null
                         },
                         icon = {
                             if (t == Tab.Notifications && state.unreadCount > 0) {
@@ -107,7 +115,18 @@ fun HomeScreen(
                 if (state.offline) OfflineBanner(Modifier.align(Alignment.TopCenter).padding(top = inner.calculateTopPadding()))
                 val pad = if (state.offline) PaddingValues(top = inner.calculateTopPadding() + 32.dp, bottom = inner.calculateBottomPadding()) else inner
                 val opened = state.personas.firstOrNull { !it.locked && it.id == openPersonaId }
+                val threadPost = openThread?.let { (postId, _) -> state.posts.firstOrNull { it.id == postId } }
+                val threadReaction = openThread?.let { (_, rid) -> threadPost?.reactions?.firstOrNull { it.id == rid } }
                 when {
+                    tab == Tab.Timeline && threadPost != null && threadReaction != null -> ThreadScreen(
+                        post = threadPost,
+                        reaction = threadReaction,
+                        sending = state.threadSending,
+                        onSend = { text, ok -> onSendThreadMessage(threadReaction, text, ok) },
+                        onToggleLike = { onToggleLike(threadReaction) },
+                        onBack = { openThread = null },
+                        contentPadding = pad,
+                    )
                     tab == Tab.Followers && opened != null -> PersonaDetailScreen(
                         persona = opened,
                         interactions = interactionsWith(state.posts, opened.id!!),
@@ -121,6 +140,8 @@ fun HomeScreen(
                         sending = state.sending,
                         nowMs = nowMs,
                         onPost = onPost,
+                        onOpenThread = { post, r -> openThread = post.id to r.id },
+                        onToggleLike = onToggleLike,
                         contentPadding = pad,
                     )
                     tab == Tab.Followers -> FollowersScreen(
@@ -131,6 +152,13 @@ fun HomeScreen(
                     tab == Tab.Notifications -> NotificationsScreen(
                         notifications = state.notifications,
                         nowMs = nowMs,
+                        // 返信の通知をタップすると、タイムラインでその会話が開く
+                        onOpen = { n ->
+                            if (n.postId != null && n.reactionId != null) {
+                                tab = Tab.Timeline
+                                openThread = n.postId to n.reactionId
+                            }
+                        },
                         contentPadding = pad,
                     )
                     else -> SettingsScreen(

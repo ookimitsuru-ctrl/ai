@@ -10,6 +10,7 @@ import com.hitorigoto.app.data.RegisterResponse
 import com.hitorigoto.app.data.SessionState
 import com.hitorigoto.app.data.SessionStore
 import com.hitorigoto.app.data.SnsApi
+import com.hitorigoto.app.data.ThreadMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -40,6 +41,8 @@ class FakeApi : SnsApi {
     var markReadCalls = 0
     var deleteCalls = 0
     val registerCalls = mutableListOf<Pair<String, String?>>()
+    val likeCalls = mutableListOf<Pair<String, Boolean>>()
+    val threadSent = mutableListOf<Pair<String, String>>()
 
     private fun check() { error?.let { throw it } }
     override suspend fun register(inviteCode: String, nickname: String?): RegisterResponse { registerCalls += inviteCode to nickname; check(); return registerResult }
@@ -49,5 +52,7 @@ class FakeApi : SnsApi {
     override suspend fun createPost(body: String): CreatedPost { check(); created += body; return CreatedPost("new", body, 0) }
     override suspend fun posts(limit: Int): List<PostView> { check(); return posts }
     override suspend fun notifications(limit: Int): NotificationsResponse { check(); return NotificationsResponse(notifications, unread) }
+    override suspend fun setLike(reactionId: String, liked: Boolean) { likeCalls += reactionId to liked; check() }
+    override suspend fun sendThreadMessage(reactionId: String, body: String): ThreadMessage { check(); threadSent += reactionId to body; return ThreadMessage("m", "user", body, 0) }
     override suspend fun markAllRead(): Int { markReadCalls++; check(); unread = 0; return 0 }
 }

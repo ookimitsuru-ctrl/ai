@@ -40,6 +40,12 @@ data class PersonasResponse(val personas: List<PersonaSlot>)
 @Serializable
 data class ReactionPersona(val id: String, val name: String, val handle: String)
 
+/** スレッド(フォロワーの返信への返信)の1発言。role は "user"(自分)か "persona"(フォロワー) */
+@Serializable
+data class ThreadMessage(val id: String, val role: String, val text: String, val createdAt: Long) {
+    val isMine get() = role == "user"
+}
+
 @Serializable
 data class Reaction(
     val id: String,
@@ -48,6 +54,12 @@ data class Reaction(
     val text: String? = null,
     val visibleAt: Long,
     val persona: ReactionPersona,
+    /** 自分がこの返信にいいねしているか(返信にだけ付く) */
+    val liked: Boolean = false,
+    /** この返信についての会話(自分とフォロワーの発言) */
+    val thread: List<ThreadMessage> = emptyList(),
+    /** フォロワーが返事を考えている最中 */
+    val replying: Boolean = false,
 ) {
     val isReply get() = type == "reply" && !text.isNullOrBlank()
     val isLike get() = type == "like"
@@ -89,6 +101,8 @@ data class NotificationView(
     val read: Boolean,
     val persona: ReactionPersona,
     val postId: String? = null,
+    /** どの返信(スレッド)についての通知か。返信の通知をタップして、その会話を開くのに使う */
+    val reactionId: String? = null,
     val text: String? = null,
 )
 
@@ -100,3 +114,9 @@ data class UnreadResponse(val unreadCount: Int)
 
 @Serializable
 data class ErrorBody(val error: String? = null, val limit: Int? = null, val max: Int? = null)
+
+@Serializable
+data class LikeResponse(val liked: Boolean)
+
+@Serializable
+data class SendMessageResponse(val message: ThreadMessage)

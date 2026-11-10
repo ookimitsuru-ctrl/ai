@@ -1,4 +1,4 @@
-# ひとりごと Android アプリ (M4)
+# ひとりごと Android アプリ (M4〜M5)
 
 Kotlin + Jetpack Compose。サーバーは [`../server`](../server/README.md)、仕様は [`../SPEC.md`](../SPEC.md)。
 Android 8.0(API 26)以上。デバッグビルドだけ http(平文)でつなげる。リリースビルドは https のみ。
@@ -13,10 +13,16 @@ Android 8.0(API 26)以上。デバッグビルドだけ http(平文)でつなげ
 |---|---|---|---|
 | ![](../docs/screens/06_notifications.png) | ![](../docs/screens/07_settings.png) | ![](../docs/screens/09_timeline_dark.png) | ![](../docs/screens/10_register.png) |
 
+| 返信にいいね・会話へ | 会話画面 | 返事を待っている間 |
+|---|---|---|
+| ![](../docs/screens/12_timeline_thread.png) | ![](../docs/screens/13_thread.png) | ![](../docs/screens/14_thread_replying.png) |
+
 画像は、サーバーが実際に返したデータ(`app/src/test/resources/fixtures/`)を画面テストで描画したもの。
 
 - **登録**: 招待コードを入れて匿名で登録(メールアドレス不要)。接続先サーバーも指定できる。
 - **タイムライン**: つぶやく(140字)。投稿はすぐ反映され、フォロワーの反応は表示時刻になったものから現れる。処理中は「フォロワーが読んでいます…」。
+- **フォロワーの返信へのいいね**: 返信の右のハートを押すといいね(もう一度押すと取り消し)。押した瞬間に画面へ反映し、サーバーが失敗したら元に戻す。
+- **スレッド(会話)**: 返信をタップすると会話画面が開く。そこで返信を書くと、同じフォロワーが数秒〜30秒後に続きの返事をする(その間は「返事を考えています…」。返事待ちの間は次を送れない)。通知の「返信しました」をタップしても、その会話が開く。
 - **フォロワー**: 20枠。まだ出会っていない人は「???」。タップで自己紹介・好きな話題・あなたとのやりとり。
 - **通知**: 新規フォロー・いいね・返信。タブに未読数のバッジ。開くと既読になる。
 - **設定**: 接続先の変更、データの全削除(確認ダイアログあり)。
@@ -45,7 +51,7 @@ Android 8.0(API 26)以上。デバッグビルドだけ http(平文)でつなげ
 
 ```sh
 cd ai-sns/android
-./gradlew testDebugUnitTest        # 64件(API・ViewModel・画面)。エミュレータ不要
+./gradlew testDebugUnitTest        # 83件(API・ViewModel・画面)。エミュレータ不要
 ./gradlew assembleDebug            # app/build/outputs/apk/debug/app-debug.apk
 ./gradlew testDebugUnitTest -Proborazzi.test.record=true   # 画面の画像を app/build/screens/ に出力
 ```

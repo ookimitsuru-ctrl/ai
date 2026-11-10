@@ -1,6 +1,7 @@
 package com.hitorigoto.app.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import com.hitorigoto.app.ui.relativeTime
 fun NotificationsScreen(
     notifications: List<NotificationView>,
     nowMs: Long,
+    onOpen: (NotificationView) -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -63,7 +65,9 @@ fun NotificationsScreen(
         }
         items(notifications, key = { it.id }) { n ->
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                // 返信の通知は、タップするとその会話が開く
+                Modifier.fillMaxWidth().then(if (n.type == "reply" && n.reactionId != null) Modifier.clickable { onOpen(n) } else Modifier)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Top,
             ) {

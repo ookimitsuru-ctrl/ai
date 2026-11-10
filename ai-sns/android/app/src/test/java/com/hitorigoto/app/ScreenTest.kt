@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -21,6 +22,7 @@ import com.hitorigoto.app.data.NotificationsResponse
 import com.hitorigoto.app.data.PersonasResponse
 import com.hitorigoto.app.data.PostView
 import com.hitorigoto.app.data.PostsResponse
+import com.hitorigoto.app.data.Reaction
 import com.hitorigoto.app.ui.home.HomeScreen
 import com.hitorigoto.app.ui.home.HomeUiState
 import com.hitorigoto.app.ui.home.Tab
@@ -76,6 +78,8 @@ class ScreenTest {
         var deleted = 0
         var consumed = 0
         val savedUrls = mutableListOf<String>()
+        val likes = mutableListOf<String>()
+        val sent = mutableListOf<Pair<String, String>>()
     }
 
     private fun show(
@@ -92,6 +96,8 @@ class ScreenTest {
                     serverUrl = "http://10.0.2.2:8787",
                     nowMs = now,
                     onPost = { text, ok -> calls.posted += text; ok() },
+                    onToggleLike = { calls.likes += it.id },
+                    onSendThreadMessage = { r, text, ok -> calls.sent += r.id to text; ok() },
                     onMarkAllRead = { calls.markRead++ },
                     onSaveServerUrl = { calls.savedUrls += it },
                     onDeleteAccount = { calls.deleted++ },
@@ -169,7 +175,7 @@ class ScreenTest {
     // ---------- フォロワー ----------
     @Test fun `フォロワー_20枠のうち出会った人数と、未解放は???で出る`() {
         show(full(), tab = Tab.Followers)
-        rule.onNodeWithText("フォロワー 8/20").assertIsDisplayed()
+        rule.onNodeWithText("フォロワー 6/20").assertIsDisplayed()
         assertTrue(rule.onAllNodesWithText("???").fetchSemanticsNodes().isNotEmpty())
         assertTrue(rule.onAllNodesWithText("まだ出会っていない人").fetchSemanticsNodes().isNotEmpty())
         shot("04_followers")
@@ -184,19 +190,19 @@ class ScreenTest {
         rule.onNodeWithText("@${first.handle}").assertIsDisplayed()
         shot("05_persona_detail")
         rule.onNodeWithContentDescription("戻る").performClick()
-        rule.onNodeWithText("フォロワー 8/20").assertIsDisplayed()
+        rule.onNodeWithText("フォロワー 6/20").assertIsDisplayed()
     }
 
     @Test fun `フォロワー_未解放のカードを押しても何も開かない`() {
         show(full(), tab = Tab.Followers)
         rule.onAllNodesWithText("???")[0].performClick()
-        rule.onNodeWithText("フォロワー 8/20").assertIsDisplayed() // 詳細に移っていない
+        rule.onNodeWithText("フォロワー 6/20").assertIsDisplayed() // 詳細に移っていない
     }
 
     // ---------- 通知 ----------
     @Test fun `通知_未読数のバッジが出て、開くと既読を依頼する`() {
         val calls = show(full())
-        rule.onNodeWithText("19", useUnmergedTree = true).assertIsDisplayed() // タブのバッジ
+        rule.onNodeWithText("17", useUnmergedTree = true).assertIsDisplayed() // タブのバッジ
         rule.onNodeWithText("通知").performClick()
         rule.waitForIdle()
         assertEquals(1, calls.markRead)
@@ -220,7 +226,7 @@ class ScreenTest {
     @Test fun `設定_ニックネーム・人数・接続先が出る`() {
         show(full(), tab = Tab.Settings)
         rule.onNodeWithText("みつる").assertIsDisplayed()
-        rule.onNodeWithText("フォロワー 8 人").assertIsDisplayed()
+        rule.onNodeWithText("フォロワー 6 人").assertIsDisplayed()
         rule.onNodeWithText("http://10.0.2.2:8787").assertIsDisplayed()
         rule.onNodeWithText("保存").assertIsNotEnabled() // 変えていないので押せない
         shot("07_settings")
@@ -302,5 +308,92 @@ class ScreenTest {
     @Test fun `登録画面_登録中は「はじめる」が押せない`() {
         rule.setContent { Register(RegisterUiState(serverUrl = "u", loading = true), mutableListOf()) }
         assertFalse(runCatching { rule.onNodeWithText("はじめる").assertIsDisplayed() }.isSuccess) // 文字が進行表示に変わる
+    }
+
+    // ---------- いいね・スレッド ----------
+    /** 会話(いいね済み+4発言)が付いた返信を持つつぶやきを、いちばん上に出した状態 */
+    private fun threadState(replying: Boolean = false): Triple<HomeUiState, PostView, Reaction> {
+        val post = posts.first { p -> p.reactions.any { it.thread.isNotEmpty() } }
+        val withReplying = post.copy(reactions = post.reactions.map { if (it.thread.isNotEmpty()) it.copy(replying = replying) else it })
+        val reaction = withReplying.reactions.first { it.thread.isNotEmpty() }
+        return Triple(full(posts = listOf(withReplying) + posts.filter { it.id != post.id }), withReplying, reaction)
+    }
+
+    @Test fun `返信に、いいねのハートと「会話を見る」が出る`() {
+        val (state, _, r) = threadState()
+        show(state)
+        assertTrue(rule.onAllNodesWithContentDescription("いいね").fetchSemanticsNodes().isNotEmpty())
+        rule.onNodeWithText("会話を見る(${r.thread.size})").assertIsDisplayed()
+        rule.onNodeWithContentDescription("いいねを取り消す").assertIsDisplayed() // この返信はいいね済み
+        shot("12_timeline_thread")
+    }
+
+    @Test fun `ハートを押すと、その返信のいいね操作が伝わる`() {
+        val (state, _, r) = threadState()
+        val calls = show(state)
+        rule.onNodeWithContentDescription("いいねを取り消す").performClick()
+        assertEquals(listOf(r.id), calls.likes)
+    }
+
+    @Test fun `返信を押すと会話の画面が開き、元のつぶやき・返信・やりとりが並ぶ。戻れる`() {
+        val (state, post, r) = threadState()
+        show(state)
+        rule.onNodeWithText("会話を見る(${r.thread.size})").performClick()
+        rule.onNodeWithText("あなたのつぶやき").assertIsDisplayed()
+        rule.onNodeWithText(post.body).assertIsDisplayed()
+        rule.onNodeWithText(r.text!!).assertIsDisplayed()
+        rule.onNodeWithText(r.thread.first { it.isMine }.text).assertIsDisplayed() // 自分の発言
+        rule.onNodeWithText("返信を書く").assertIsDisplayed()
+        shot("13_thread")
+        rule.onNodeWithContentDescription("戻る").performClick()
+        rule.onNodeWithText("会話を見る(${r.thread.size})").assertIsDisplayed()
+    }
+
+    @Test fun `会話の画面で、書いて送ると本文が渡され、入力欄は空に戻る。空のままは送れない`() {
+        val (state, _, r) = threadState()
+        val calls = show(state)
+        rule.onNodeWithText("会話を見る(${r.thread.size})").performClick()
+        rule.onNodeWithContentDescription("送信").assertIsNotEnabled()
+        rule.onNodeWithText("返信を書く").performTextInput("ありがとう、試してみる")
+        rule.onNodeWithText("11/140").assertIsDisplayed()
+        rule.onNodeWithContentDescription("送信").assertIsEnabled().performClick()
+        assertEquals(listOf(r.id to "ありがとう、試してみる"), calls.sent)
+        rule.onNodeWithText("返信を書く").assertIsDisplayed() // 空に戻った
+    }
+
+    @Test fun `フォロワーが返事を考えている間は「考えています」を出し、送れない`() {
+        val (state, _, _) = threadState(replying = true)
+        show(state)
+        rule.onNodeWithText("返事を考えています…").assertIsDisplayed() // タイムラインの返信の下
+        rule.onNodeWithText("返事を考えています…").performClick() // 返信の行を押して会話を開く
+        rule.onNodeWithText("返事を待っています…").assertIsDisplayed() // 入力欄
+        rule.onNodeWithContentDescription("送信").assertIsNotEnabled()
+        shot("14_thread_replying")
+    }
+
+    @Test fun `会話の画面のハートでも、いいねできる`() {
+        val (state, _, r) = threadState()
+        val calls = show(state)
+        rule.onNodeWithText("会話を見る(${r.thread.size})").performClick()
+        rule.onNodeWithContentDescription("いいねを取り消す").performClick()
+        assertEquals(listOf(r.id), calls.likes)
+    }
+
+    @Test fun `返信の通知を押すと、タイムラインでその会話が開く。フォローの通知では開かない`() {
+        val reply = notes.notifications.first { it.type == "reply" }
+        val calls = show(full(), tab = Tab.Notifications)
+        rule.onAllNodesWithText("さんがフォローしました", substring = true)[0].performClick()
+        assertEquals(0, rule.onAllNodesWithText("あなたのつぶやき").fetchSemanticsNodes().size) // 会話は開いていない(フォロー通知では何も起きない)
+        rule.onAllNodesWithText("${reply.persona.name}さんが返信しました")[0].performClick()
+        rule.onNodeWithText("あなたのつぶやき").assertIsDisplayed()
+        assertEquals(0, calls.sent.size)
+    }
+
+    @Test fun `会話の画面で、元のつぶやきが一覧から消えていたら一覧に戻る(古い通知など)`() {
+        val reply = notes.notifications.first { it.type == "reply" }
+        show(full(posts = posts.filter { it.id != reply.postId }), tab = Tab.Notifications)
+        rule.onAllNodesWithText("${reply.persona.name}さんが返信しました")[0].performClick()
+        // 会話は開けず、タイムライン(つぶやき一覧)が出る
+        rule.onNodeWithText("いまどうしてる?").assertIsDisplayed()
     }
 }

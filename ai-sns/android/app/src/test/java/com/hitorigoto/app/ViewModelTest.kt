@@ -56,8 +56,8 @@ class ViewModelTest {
         val s = vm.state.value
         assertTrue(s.loaded)
         assertEquals(6, s.posts.size)
-        assertEquals(8, s.followerCount)
-        assertEquals(19, s.unreadCount)
+        assertEquals(6, s.followerCount)
+        assertEquals(17, s.unreadCount)
         assertFalse(s.offline)
     }
 
@@ -138,7 +138,7 @@ class ViewModelTest {
         api.error = IOException("down")
         vm.markAllRead()
         advanceUntilIdle()
-        assertEquals(19, vm.state.value.unreadCount) // そのまま。次の取得でやり直せる
+        assertEquals(17, vm.state.value.unreadCount) // そのまま。次の取得でやり直せる
     }
 
     @Test fun `データ削除はサーバーに削除を依頼してからログアウトする`() = runTest(dispatcher) {
@@ -163,6 +163,71 @@ class ViewModelTest {
         advanceUntilIdle()
         assertEquals("http://192.168.1.10:8787", store.state.value.serverUrl)
         assertTrue(vm.state.value.loaded)
+    }
+
+    // ---------- いいね・スレッド ----------
+    private fun replyReaction(vm: HomeViewModel) = vm.state.value.posts.flatMap { it.reactions }.first { it.isReply && !it.liked }
+    private fun reactionNow(vm: HomeViewModel, id: String) = vm.state.value.posts.flatMap { it.reactions }.first { it.id == id }
+
+    @Test fun `いいねは、サーバーの返事を待たずに画面に反映され、もう一度押すと取り消せる`() = runTest(dispatcher) {
+        val vm = home()
+        vm.refresh()
+        val r = replyReaction(vm)
+        vm.toggleLike(r)
+        assertTrue(reactionNow(vm, r.id).liked) // すぐ反映(まだサーバーに届く前)
+        advanceUntilIdle()
+        assertEquals(listOf(r.id to true), api.likeCalls)
+        vm.toggleLike(reactionNow(vm, r.id))
+        assertFalse(reactionNow(vm, r.id).liked)
+        advanceUntilIdle()
+        assertEquals(listOf(r.id to true, r.id to false), api.likeCalls)
+    }
+
+    @Test fun `いいねに失敗したら元に戻し、理由を見せる`() = runTest(dispatcher) {
+        val vm = home()
+        vm.refresh()
+        val r = replyReaction(vm)
+        api.error = IOException("down")
+        vm.toggleLike(r)
+        advanceUntilIdle()
+        assertFalse(reactionNow(vm, r.id).liked) // 押す前の状態に戻っている
+        assertNotNull(vm.state.value.message)
+    }
+
+    @Test fun `スレッドに発言すると送信され、入力欄を空にして再取得する`() = runTest(dispatcher) {
+        val vm = home()
+        vm.refresh()
+        val r = replyReaction(vm)
+        var cleared = false
+        vm.sendThreadMessage(r, "  こんにちは  ") { cleared = true }
+        advanceUntilIdle()
+        assertEquals(listOf(r.id to "こんにちは"), api.threadSent)
+        assertTrue(cleared)
+        assertFalse(vm.state.value.threadSending)
+    }
+
+    @Test fun `返事を待っている間・空・長すぎる発言は送らない`() = runTest(dispatcher) {
+        val vm = home()
+        vm.refresh()
+        val r = replyReaction(vm)
+        vm.sendThreadMessage(r.copy(replying = true), "こんにちは") { }
+        vm.sendThreadMessage(r, "  ") { }
+        vm.sendThreadMessage(r, "あ".repeat(141)) { }
+        advanceUntilIdle()
+        assertTrue(api.threadSent.isEmpty())
+    }
+
+    @Test fun `スレッドへの送信に失敗したら入力欄は残し、理由を見せる`() = runTest(dispatcher) {
+        val vm = home()
+        vm.refresh()
+        val r = replyReaction(vm)
+        api.error = ApiException(409, "reply_pending")
+        var cleared = false
+        vm.sendThreadMessage(r, "こんにちは") { cleared = true }
+        advanceUntilIdle()
+        assertFalse(cleared)
+        assertTrue(vm.state.value.message!!.contains("返事を待っています"))
+        assertFalse(vm.state.value.threadSending)
     }
 
     // ---------- AuthViewModel ----------

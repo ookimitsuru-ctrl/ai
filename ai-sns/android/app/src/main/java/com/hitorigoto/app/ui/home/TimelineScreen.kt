@@ -1,5 +1,6 @@
 package com.hitorigoto.app.ui.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,6 +14,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -46,6 +52,8 @@ fun TimelineScreen(
     sending: Boolean,
     nowMs: Long,
     onPost: (text: String, onSuccess: () -> Unit) -> Unit,
+    onOpenThread: (PostView, Reaction) -> Unit,
+    onToggleLike: (Reaction) -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -65,7 +73,7 @@ fun TimelineScreen(
             item { EmptyTimeline(followerCount) }
         }
         items(posts, key = { it.id }) { post ->
-            PostCard(post, nowMs)
+            PostCard(post, nowMs, onOpenThread, onToggleLike)
         }
     }
 }
@@ -129,7 +137,13 @@ private fun EmptyTimeline(followerCount: Int) {
 }
 
 @Composable
-fun PostCard(post: PostView, nowMs: Long, modifier: Modifier = Modifier) {
+fun PostCard(
+    post: PostView,
+    nowMs: Long,
+    onOpenThread: (PostView, Reaction) -> Unit,
+    onToggleLike: (Reaction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -163,7 +177,7 @@ fun PostCard(post: PostView, nowMs: Long, modifier: Modifier = Modifier) {
             if (post.reactions.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-                post.replies.forEach { ReplyRow(it) }
+                post.replies.forEach { r -> ReplyRow(r, onOpen = { onOpenThread(post, r) }, onToggleLike = { onToggleLike(r) }) }
                 if (post.likes.isNotEmpty()) LikesRow(post.likes)
             }
         }
@@ -171,10 +185,13 @@ fun PostCard(post: PostView, nowMs: Long, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ReplyRow(r: Reaction) {
-    Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+private fun ReplyRow(r: Reaction, onOpen: () -> Unit, onToggleLike: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(top = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         Avatar(r.persona.name, r.persona.handle, size = 32.dp)
-        Column {
+        Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(r.persona.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                 Text(
@@ -184,6 +201,24 @@ private fun ReplyRow(r: Reaction) {
                 )
             }
             Text(r.text.orEmpty(), style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(2.dp))
+            Text(
+                when {
+                    r.replying -> "返事を考えています…"
+                    r.thread.isNotEmpty() -> "会話を見る(${r.thread.size})"
+                    else -> "返信する"
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        IconButton(onClick = onToggleLike, modifier = Modifier.size(36.dp)) {
+            Icon(
+                if (r.liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                contentDescription = if (r.liked) "いいねを取り消す" else "いいね",
+                tint = if (r.liked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
         }
     }
 }

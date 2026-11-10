@@ -27,6 +27,10 @@ interface SnsApi {
     suspend fun posts(limit: Int = 20): List<PostView>
     suspend fun notifications(limit: Int = 50): NotificationsResponse
     suspend fun markAllRead(): Int
+    /** フォロワーの返信にいいね / 取り消し */
+    suspend fun setLike(reactionId: String, liked: Boolean)
+    /** フォロワーの返信に返信する(スレッド)。フォロワーの返事は、しばらくしてから現れる */
+    suspend fun sendThreadMessage(reactionId: String, body: String): ThreadMessage
 }
 
 /** OkHttp で ai-sns サーバーに話す実装。接続先とトークンは、呼び出しのたびに SessionStore から読む */
@@ -64,6 +68,17 @@ class HttpSnsApi(
         val json = AppJson.encodeToString(buildJsonObject { put("all", true) })
         return call<UnreadResponse>("POST", "/v1/notifications/read", json).unreadCount
     }
+
+    override suspend fun setLike(reactionId: String, liked: Boolean) {
+        callRaw(if (liked) "PUT" else "DELETE", "/v1/reactions/${encodeId(reactionId)}/like", null, auth = true)
+    }
+
+    override suspend fun sendThreadMessage(reactionId: String, body: String): ThreadMessage {
+        val json = AppJson.encodeToString(buildJsonObject { put("body", body) })
+        return call<SendMessageResponse>("POST", "/v1/reactions/${encodeId(reactionId)}/messages", json).message
+    }
+
+    private fun encodeId(id: String) = java.net.URLEncoder.encode(id, "UTF-8")
 
     private suspend inline fun <reified T> call(method: String, path: String, json: String? = null, auth: Boolean = true): T {
         val text = callRaw(method, path, json, auth)

@@ -82,6 +82,9 @@ class LogicTest {
     @Test fun `エラーの文言`() {
         assertTrue(errorMessage(ApiException(403, "invalid_invite")).contains("招待コード"))
         assertTrue(errorMessage(ApiException(429, "daily_limit", limit = 10)).contains("10回"))
+        assertTrue(errorMessage(ApiException(409, "reply_pending")).contains("返事を待っています"))
+        assertTrue(errorMessage(ApiException(429, "thread_limit", limit = 20)).contains("20回"))
+        assertTrue(errorMessage(ApiException(404, "not_found")).contains("見つかりませんでした"))
         assertTrue(errorMessage(ApiException(400, "invalid_length", max = 140)).contains("140"))
         assertTrue(errorMessage(ApiException(500, "internal_error")).contains("500"))
         assertTrue(errorMessage(IOException("boom")).contains("つながりません"))

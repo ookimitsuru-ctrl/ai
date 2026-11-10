@@ -71,7 +71,7 @@ class HttpSnsApiTest {
 
     @Test fun `通知の取得と既読`() = runTest {
         server.enqueue(json(fixture("notifications.json")))
-        assertEquals(19, api.notifications(50).unreadCount)
+        assertEquals(17, api.notifications(50).unreadCount)
         assertEquals("/v1/notifications?limit=50", server.takeRequest().path)
 
         server.enqueue(json(fixture("read.json")))
@@ -128,5 +128,39 @@ class HttpSnsApiTest {
         server.enqueue(json(fixture("me.json")))
         api.me()
         assertEquals("/v1/me", server.takeRequest().path)
+    }
+
+    @Test fun `いいねは PUT、取り消しは DELETE。返信IDの記号は安全に符号化する`() = runTest {
+        server.enqueue(json(fixture("like.json")))
+        api.setLike("abc-123:kenji_run", true)
+        var req = server.takeRequest()
+        assertEquals("PUT", req.method)
+        assertEquals("/v1/reactions/abc-123%3Akenji_run/like", req.path)
+        assertEquals("Bearer tok-123", req.getHeader("authorization"))
+
+        server.enqueue(json("""{"liked":false}"""))
+        api.setLike("abc-123:kenji_run", false)
+        req = server.takeRequest()
+        assertEquals("DELETE", req.method)
+        assertEquals("/v1/reactions/abc-123%3Akenji_run/like", req.path)
+    }
+
+    @Test fun `スレッドへの発言は POST で、本文を送り、発言を受け取る`() = runTest {
+        server.enqueue(json(fixture("thread_message_created.json"), 201))
+        val m = api.sendThreadMessage("abc:kenji_run", "ありがとう!明日も走るよ")
+        val req = server.takeRequest()
+        assertEquals("POST", req.method)
+        assertEquals("/v1/reactions/abc%3Akenji_run/messages", req.path)
+        assertEquals("""{"body":"ありがとう!明日も走るよ"}""", req.body.readUtf8())
+        assertTrue(m.isMine)
+    }
+
+    @Test fun `返事待ち(409)・上限(429)・見つからない(404)は、コード付きの例外`() = runTest {
+        server.enqueue(json("""{"error":"reply_pending"}""", 409))
+        assertEquals("reply_pending", (runCatching { api.sendThreadMessage("x", "y") }.exceptionOrNull() as ApiException).code)
+        server.enqueue(json("""{"error":"thread_limit","limit":20}""", 429))
+        assertEquals(20, (runCatching { api.sendThreadMessage("x", "y") }.exceptionOrNull() as ApiException).limit)
+        server.enqueue(json(fixture("error_not_found.json"), 404))
+        assertEquals(404, (runCatching { api.setLike("x", true) }.exceptionOrNull() as ApiException).status)
     }
 }

@@ -73,6 +73,8 @@ fun AppRoot(container: AppContainer) {
                 serverUrl = session.serverUrl,
                 nowMs = maxOf(now, state.posts.maxOfOrNull { it.createdAt } ?: 0L),
                 onPost = vm::post,
+                onToggleLike = vm::toggleLike,
+                onSendThreadMessage = vm::sendThreadMessage,
                 onMarkAllRead = vm::markAllRead,
                 onSaveServerUrl = vm::updateServerUrl,
                 onDeleteAccount = vm::deleteAccount,
