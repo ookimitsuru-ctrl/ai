@@ -223,7 +223,7 @@ describe("会話への組み込み(統合)", () => {
     const net = fakeNetwork();
     for (let i = 0; i < 3; i++) await withEnv({}, "/v1/posts", authed(token, "POST", { body: "今日はゲームした。楽しかった" }));
     expect(net.external).toEqual([]);
-    expect(net.prompts.join("")).not.toContain("調べた結果");
+    expect(net.prompts.join("")).not.toContain("調べた結果(");
   });
 
   it("スレッドで「他にも面白いゲームない?」と聞くと、そのフォロワーが調べた結果を踏まえて返事する", async () => {
@@ -254,7 +254,7 @@ describe("会話への組み込み(統合)", () => {
     const net = fakeNetwork();
     for (let i = 0; i < 3; i++) await withEnv({ LOOKUP_ENABLED: "false" }, "/v1/posts", authed(token, "POST", { body: "面白いゲームないかな" }));
     expect(net.external).toEqual([]);
-    expect(net.prompts.join("")).not.toContain("調べた結果");
+    expect(net.prompts.join("")).not.toContain("調べた結果(");
   });
 
   it("調べに失敗しても、投稿も返信も普通に完了する", async () => {

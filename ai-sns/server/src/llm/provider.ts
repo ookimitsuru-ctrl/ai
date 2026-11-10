@@ -6,6 +6,8 @@ export interface ReplyTarget {
   isNewFollower: boolean;
   /** このユーザーとの直近のやりとり(他ユーザーのデータは絶対に含めない) */
   recentExchanges: { userText: string; replyText: string }[];
+  /** 質問・頼みごとへの返信での、このキャラの役割(要点を答える・具体例を挙げる・注意点を添える…)。全員で1つの答えを分担する */
+  role?: string;
   /** 今回の返信の切り口(共感・質問・豆知識など)。毎回同じ調子にならないよう、返信ごとに変える */
   angle?: string;
   /** 最近のニュースの見出し。自然に触れられるときだけ、ひと言触れる(任意) */

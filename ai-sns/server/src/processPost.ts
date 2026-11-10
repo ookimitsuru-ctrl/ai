@@ -8,6 +8,7 @@ import type { GeneratedReply, LlmProvider, ReplyTarget } from "./llm/provider";
 import { decideReactions } from "./reactions";
 import { randomFor } from "./rng";
 import { lookupForText } from "./lookup";
+import { assignRoles, looksLikeRequest } from "./roles";
 import { loadHeadlines, newsEnabled, pickHeadline, refreshNewsForTags } from "./news";
 import { loadReplyTargets } from "./targets";
 import { analyzeByKeywords } from "./topics";
@@ -128,6 +129,16 @@ export async function processPost(env: Env, postId: string, opts: { degraded?: b
   // 切り口を人ごとに変える(同じ調子の返信が並ばないように)
   const angles = assignAngles(postId, replyIds);
   for (const t of targets) t.angle = angles.get(t.persona.id);
+  // 質問・頼みごとのときは、返信する全員で1つの答えを分担する(役割を割り当てる。切り口は使わない)
+  if (looksLikeRequest(post.body) && targets.length > 0) {
+    const affinity = new Map(plan.map((r) => [r.personaId, r.affinity]));
+    const ordered = targets.map((t) => t.persona.id).sort((a, b) => (affinity.get(b) ?? 0) - (affinity.get(a) ?? 0));
+    const roles = assignRoles(ordered);
+    for (const t of targets) {
+      t.role = roles.get(t.persona.id);
+      t.angle = undefined;
+    }
+  }
   // ニュースの見出し・頼まれた調べもの(有効なときだけ。取れなければ何も付けない)
   if (!opts.degraded) {
     await attachNews(env, postId, topics, targets);
