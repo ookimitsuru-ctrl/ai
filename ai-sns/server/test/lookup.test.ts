@@ -2,7 +2,7 @@ import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test"
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import app from "../src/index";
-import { ADAPTERS, LOOKUP_TTL_MS, appleTopSongs, anilist, detectLookup, lookupForText, steamTopSellers } from "../src/lookup";
+import { ADAPTERS, LOOKUP_TTL_MS, appleTopSongs, anilist, detectLookup, dropSequels, lookupForText, steamTopSellers } from "../src/lookup";
 import { authed, bearer, call, register, resetDb, seedReply } from "./helpers";
 
 beforeEach(async () => {
@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 // 各サービスの公開APIの形を模した見本(実際の応答の確認は、お手元で `npm run try-lookup` を実行して行う)
-const STEAM = { top_sellers: { id: "cat_topsellers", name: "売れ筋", items: [{ id: 1, name: "Counter-Strike 2" }, { id: 2, name: "モンスターハンターワイルズ" }, { id: 3, name: "Baldur's Gate 3" }, { name: "  モンスターハンターワイルズ  " }, { id: 5 }, { id: 6, name: "Palworld / パルワールド" }] } };
+const STEAM = { top_sellers: { id: "cat_topsellers", name: "売れ筋", items: [{ id: 1, name: "Counter-Strike 2" }, { id: 2, name: "モンスターハンターワイルズ" }, { id: 3, name: "Baldur's Gate 3" }, { name: "  モンスターハンターワイルズ  " }, { id: 5 }, { id: 6, name: "Palworld / パルワールド" }, { id: 7, name: "Call of Duty®: Modern Warfare® 4" }] } };
 const ANILIST = { data: { Page: { media: [{ title: { native: "葬送のフリーレン", romaji: "Sousou no Frieren" } }, { title: { native: null, romaji: "Dandadan" } }, { title: {} }] } } };
 const APPLE = { feed: { results: [{ name: "ライラック", artistName: "Mrs. GREEN APPLE" }, { name: "Subtitle", artistName: "Official髭男dism" }, { name: "曲だけ" }] } };
 
@@ -51,7 +51,7 @@ describe("調べ先の読み取り", () => {
   it("Steam: 売れ筋の名前だけを、重複・空・長すぎを除いて取り出す", async () => {
     const urls: string[] = [];
     const f = vi.fn(async (url: string) => (urls.push(url), json(STEAM)));
-    expect(await steamTopSellers(asFetch(f))).toEqual(["Counter-Strike 2", "モンスターハンターワイルズ", "Baldur's Gate 3", "Palworld / パルワールド"]);
+    expect(await steamTopSellers(asFetch(f))).toEqual(["Counter-Strike 2", "モンスターハンターワイルズ", "Baldur's Gate 3", "Palworld / パルワールド", "Call of Duty: Modern Warfare 4"]); // ®は除く
     expect(urls[0]).toBe("https://store.steampowered.com/api/featuredcategories?cc=jp&l=japanese");
   });
 
@@ -61,11 +61,38 @@ describe("調べ先の読み取り", () => {
     expect(await anilist("ANIME")(asFetch(f))).toEqual(["葬送のフリーレン", "Dandadan"]);
     const body = JSON.parse(init!.body as string);
     expect(body.query).toContain("isAdult: false");
+    expect(body.query).toContain("countryOfOrigin: JP"); // 日本の作品だけ(韓国・中国の作品は原語タイトルで返るため)
     expect(body.variables).toEqual({ type: "ANIME" });
   });
 
   it("Apple Music: 曲名(アーティスト)にする", async () => {
     expect(await appleTopSongs(asFetch(async () => json(APPLE)))).toEqual(["ライラック(Mrs. GREEN APPLE)", "Subtitle(Official髭男dism)", "曲だけ"]);
+  });
+
+  it("続編(第2期など)は、最初の作品にまとめる。別の作品は残す", () => {
+    expect(dropSequels(["ブラッククローバー", "ブラッククローバー 第2期", "薬屋のひとりごと 第3期", "薬屋のひとりごと", "ONE PIECE", "ONE PIECE FILM RED", "進撃の巨人 Season 2"])).toEqual([
+      "ブラッククローバー", "薬屋のひとりごと 第3期", "ONE PIECE", "ONE PIECE FILM RED", "進撃の巨人 Season 2",
+    ]);
+  });
+
+  it("Apple Music: 新しいURLが失敗(タイムアウト等)したら、旧形式のURLに切り替える", async () => {
+    const legacy = { feed: { entry: [{ "im:name": { label: "旧形式の曲" }, "im:artist": { label: "旧アーティスト" } }, { "im:name": { label: "名前だけ" } }] } };
+    const urls: string[] = [];
+    const f = vi.fn(async (url: string) => {
+      urls.push(url);
+      if (url.startsWith("https://rss.applemarketingtools.com/")) throw new Error("aborted");
+      return json(legacy);
+    });
+    expect(await appleTopSongs(asFetch(f))).toEqual(["旧形式の曲(旧アーティスト)", "名前だけ"]);
+    expect(urls).toEqual(["https://rss.applemarketingtools.com/api/v2/jp/music/most-played/10/songs.json", "https://itunes.apple.com/jp/rss/topsongs/limit=10/json"]);
+  });
+
+  it("Apple Music: 新しいURLが空の結果でも、旧形式のURLを試す。新しいURLで取れれば旧形式は使わない", async () => {
+    const f = vi.fn(async (url: string) => (url.startsWith("https://rss.applemarketingtools.com/") ? json({ feed: { results: [] } }) : json({ feed: { entry: [{ "im:name": { label: "A" } }] } })));
+    expect(await appleTopSongs(asFetch(f))).toEqual(["A"]);
+    const g = vi.fn(async () => json(APPLE));
+    await appleTopSongs(asFetch(g));
+    expect(g).toHaveBeenCalledTimes(1);
   });
 
   it("形が違う・空の応答でも落ちず、空の結果になる。HTTPエラーは例外", async () => {
