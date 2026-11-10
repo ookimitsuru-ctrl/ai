@@ -160,3 +160,124 @@ describe("データ削除", () => {
     expect((await call("/v1/me", bearer(b.token))).status).toBe(200);
   });
 });
+
+describe("つぶやき投稿とフォロー (M2)", () => {
+  const post = (token: string, body: unknown) =>
+    call("/v1/posts", { ...json({ body }), headers: { "content-type": "application/json", authorization: `Bearer ${token}` } });
+
+  it("未ログインは投稿できない", async () => {
+    expect((await call("/v1/posts", json({ body: "こんにちは" }))).status).toBe(401);
+  });
+
+  it("空・長すぎ・文字列以外は拒否(140字ちょうどはOK)", async () => {
+    const { token } = await register();
+    expect((await post(token, "   ")).status).toBe(400);
+    expect((await post(token, "あ".repeat(141))).status).toBe(400);
+    expect((await post(token, 123)).status).toBe(400);
+    expect((await post(token, "あ".repeat(140))).status).toBe(201);
+  });
+
+  it("投稿すると話題が付き、一覧に出る。内部値(親和度・確率)は返さない", async () => {
+    const { token } = await register();
+    const res = await post(token, "朝ランで10km走ってきた!");
+    expect(res.status).toBe(201);
+    const text = await res.text();
+    const body = JSON.parse(text) as {
+      post: { id: string; topics: { tag: string; label: string }[] };
+      newFollowers: unknown[];
+      followerCount: number;
+    };
+    expect(body.post.topics.map((t) => t.tag)).toContain("running");
+    expect(body.post.topics.find((t) => t.tag === "running")!.label).toBe("ランニング");
+    for (const secret of ["affinity", "probability", "theta", "interests"]) expect(text).not.toContain(secret);
+
+    const list = (await (await call("/v1/posts", bearer(token))).json()) as { posts: { id: string; body: string }[] };
+    expect(list.posts.map((p) => p.id)).toEqual([body.post.id]);
+    expect(list.posts[0]!.body).toBe("朝ランで10km走ってきた!");
+  });
+
+  it("フォロワーが増えると、一覧・自分の情報・通知に反映され、二度と外れない", async () => {
+    const { token, userId } = await register();
+    let followers = 0;
+    // 走る話題を繰り返せばケンジが(ほぼ確実に)フォローしてくる
+    for (let i = 0; i < 5 && followers === 0; i++) {
+      const r = (await (await post(token, "朝ランした。ジョギングは最高")).json()) as { followerCount: number };
+      followers = r.followerCount;
+    }
+    expect(followers).toBeGreaterThan(0);
+
+    const me = (await (await call("/v1/me", bearer(token))).json()) as { followerCount: number };
+    expect(me.followerCount).toBe(followers);
+    const list = (await (await call("/v1/personas", bearer(token))).json()) as { personas: { locked: boolean }[] };
+    expect(list.personas.filter((p) => !p.locked)).toHaveLength(followers);
+
+    const notes = await env.DB.prepare("SELECT type, ref_id FROM notifications WHERE user_id = ?")
+      .bind(userId)
+      .all<{ type: string; ref_id: string }>();
+    expect(notes.results).toHaveLength(followers);
+    expect(notes.results.every((n) => n.type === "follow")).toBe(true);
+
+    // 関係のない話題や愚痴を投稿しても、フォロワーは減らない
+    await post(token, "最悪、もう無理、愚痴");
+    const after = (await (await call("/v1/me", bearer(token))).json()) as { followerCount: number };
+    expect(after.followerCount).toBeGreaterThanOrEqual(followers);
+  });
+
+  it("フォローは話題に合った人だけ(走る話題で猫好き・美容の人は来ない)", async () => {
+    const { token } = await register();
+    const followed = new Set<string>();
+    for (let i = 0; i < 4; i++) {
+      const r = (await (await post(token, "今日は走った。筋トレもした")).json()) as { newFollowers: { id: string }[] };
+      r.newFollowers.forEach((f) => followed.add(f.id));
+    }
+    for (const id of followed) {
+      expect(["kenji_run", "take_sports", "sho_diy", "sakura_cook", "yuki_night", "yuta_fin"]).toContain(id);
+    }
+    expect(followed.has("nozomi_pets")).toBe(false);
+    expect(followed.has("akari_beauty")).toBe(false);
+  });
+
+  it("1日の投稿上限(テスト設定は5回)を超えると429", async () => {
+    const { token } = await register();
+    for (let i = 0; i < 5; i++) expect((await post(token, `投稿${i}`)).status).toBe(201);
+    const res = await post(token, "6回目");
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ error: "daily_limit", limit: 5 });
+  });
+
+  it("上限は人ごと。Aさんが上限でもBさんは投稿できる", async () => {
+    const a = await register("A");
+    const b = await register("B");
+    for (let i = 0; i < 5; i++) await post(a.token, `a${i}`);
+    expect((await post(a.token, "もう1回")).status).toBe(429);
+    expect((await post(b.token, "はじめまして")).status).toBe(201);
+  });
+
+  it("他のユーザーのつぶやきは一覧に出ない(隔離)", async () => {
+    const a = await register("A");
+    const b = await register("B");
+    await post(a.token, "Aだけの秘密のつぶやき");
+    await post(b.token, "Bのつぶやき");
+    const bList = await (await call("/v1/posts", bearer(b.token))).text();
+    expect(bList).toContain("Bのつぶやき");
+    expect(bList).not.toContain("Aだけの秘密");
+  });
+
+  it("Aさんの全フォローはBさんに影響しない(Bのフォロー数はBの投稿だけで決まる)", async () => {
+    const a = await register("A");
+    const b = await register("B");
+    for (let i = 0; i < 4; i++) await post(a.token, "朝ランした。ジョギング最高。筋トレも");
+    const meB = (await (await call("/v1/me", bearer(b.token))).json()) as { followerCount: number };
+    expect(meB.followerCount).toBe(0);
+  });
+
+  it("同じ人を二重にフォローしたり、通知を二重に作ったりしない", async () => {
+    const { token, userId } = await register();
+    for (let i = 0; i < 5; i++) await post(token, "走った走った。ランニング");
+    const rel = await env.DB.prepare("SELECT persona_id FROM relations WHERE user_id = ?").bind(userId).all<{ persona_id: string }>();
+    const ids = rel.results.map((r) => r.persona_id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const notes = await env.DB.prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id = ?").bind(userId).first<{ n: number }>();
+    expect(notes!.n).toBe(ids.length);
+  });
+});

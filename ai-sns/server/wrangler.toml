@@ -5,6 +5,8 @@ compatibility_date = "2026-11-01"
 [vars]
 # mock | ollama | anthropic (M1 は mock のみ実装)
 LLM_PROVIDER = "mock"
+# 1ユーザーの24時間あたり投稿上限
+DAILY_POST_LIMIT = "10"
 
 [[d1_databases]]
 binding = "DB"

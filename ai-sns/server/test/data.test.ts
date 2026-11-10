@@ -28,6 +28,10 @@ describe("キーワード話題解析(縮退運転)", () => {
     expect(r.reduce((s, x) => s + x.weight, 0)).toBeLessThan(1.05);
   });
 
+  it("「今日」「朝」のような一般語だけでは日常の雑談にならない(走る話題に孤独系が混ざらない)", () => {
+    expect(analyzeByKeywords("今日は朝から走った").map((x) => x.tag)).toEqual(["running"]);
+  });
+
   it("何も当たらなければ「日常の雑談」", () => {
     expect(analyzeByKeywords("あ")).toEqual([{ tag: "daily", weight: 1 }]);
   });

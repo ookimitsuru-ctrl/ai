@@ -6,6 +6,8 @@ export interface Env {
   TOKEN_SECRET: string;
   /** 管理API(招待コード発行)用。未設定なら管理APIは無効 */
   ADMIN_KEY?: string;
+  /** 1ユーザーの24時間あたり投稿上限(既定10) */
+  DAILY_POST_LIMIT?: string;
   /** mock | ollama | anthropic */
   LLM_PROVIDER?: string;
   /** テスト用 */

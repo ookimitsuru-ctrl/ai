@@ -8,6 +8,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
+    "sim": "tsx scripts/simulate.ts",
     "test": "vitest run",
     "db:local": "wrangler d1 migrations apply hitorigoto --local"
   },
@@ -17,6 +18,7 @@
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.6.1",
     "@cloudflare/workers-types": "latest",
+    "tsx": "^4.23.15",
     "typescript": "^5.6.0",
     "vitest": "^4.1.0",
     "wrangler": "^4.0.0"

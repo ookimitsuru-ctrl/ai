@@ -13,6 +13,7 @@ export default defineConfig(async () => {
             TEST_MIGRATIONS: migrations,
             TOKEN_SECRET: "test-token-secret-0123456789abcdef",
             ADMIN_KEY: "test-admin-key",
+            DAILY_POST_LIMIT: "5",
           },
         },
       }),
