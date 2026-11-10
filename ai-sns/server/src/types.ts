@@ -8,8 +8,22 @@ export interface Env {
   ADMIN_KEY?: string;
   /** 1ユーザーの24時間あたり投稿上限(既定10) */
   DAILY_POST_LIMIT?: string;
-  /** mock | ollama | anthropic */
+  /** mock | local(ollama / lmstudio / openai-compat も同じ) | anthropic */
   LLM_PROVIDER?: string;
+  /** local: OpenAI互換APIのベースURL(既定 http://localhost:11434/v1 = Ollama) */
+  LLM_BASE_URL?: string;
+  /** local: モデル名(必須) / anthropic: 既定 claude-haiku-5-5 */
+  LLM_MODEL?: string;
+  /** local: APIキーが必要なサーバー用(任意) */
+  LLM_API_KEY?: string;
+  /** local: リクエストに足す追加フィールドのJSON。例 {"chat_template_kwargs":{"enable_thinking":false}} */
+  LLM_EXTRA_BODY?: string;
+  /** local: 1リクエストのタイムアウト(ms、既定 120000) */
+  LLM_TIMEOUT_MS?: string;
+  /** anthropic: APIキー(シークレット。アプリには入れない) */
+  ANTHROPIC_API_KEY?: string;
+  /** リアクションが表示されるまでの最大遅延(ms、既定 180000。0なら即時) */
+  REACTION_DELAY_MAX_MS?: string;
   /** テスト用 */
   TEST_MIGRATIONS?: D1Migration[];
 }

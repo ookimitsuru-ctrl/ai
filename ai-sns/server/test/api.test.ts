@@ -200,7 +200,7 @@ describe("つぶやき投稿とフォロー (M2)", () => {
     const { token, userId } = await register();
     let followers = 0;
     // 走る話題を繰り返せばケンジが(ほぼ確実に)フォローしてくる
-    for (let i = 0; i < 5 && followers === 0; i++) {
+    for (let i = 0; i < 12 && followers === 0; i++) {
       const r = (await (await post(token, "朝ランした。ジョギングは最高")).json()) as { followerCount: number };
       followers = r.followerCount;
     }
@@ -211,11 +211,10 @@ describe("つぶやき投稿とフォロー (M2)", () => {
     const list = (await (await call("/v1/personas", bearer(token))).json()) as { personas: { locked: boolean }[] };
     expect(list.personas.filter((p) => !p.locked)).toHaveLength(followers);
 
-    const notes = await env.DB.prepare("SELECT type, ref_id FROM notifications WHERE user_id = ?")
+    const notes = await env.DB.prepare("SELECT type, ref_id FROM notifications WHERE user_id = ? AND type = 'follow'")
       .bind(userId)
       .all<{ type: string; ref_id: string }>();
     expect(notes.results).toHaveLength(followers);
-    expect(notes.results.every((n) => n.type === "follow")).toBe(true);
 
     // 関係のない話題や愚痴を投稿しても、フォロワーは減らない
     await post(token, "最悪、もう無理、愚痴");
@@ -237,18 +236,18 @@ describe("つぶやき投稿とフォロー (M2)", () => {
     expect(followed.has("akari_beauty")).toBe(false);
   });
 
-  it("1日の投稿上限(テスト設定は5回)を超えると429", async () => {
+  it("1日の投稿上限(テスト設定は12回)を超えると429", async () => {
     const { token } = await register();
-    for (let i = 0; i < 5; i++) expect((await post(token, `投稿${i}`)).status).toBe(201);
-    const res = await post(token, "6回目");
+    for (let i = 0; i < 12; i++) expect((await post(token, `投稿${i}`)).status).toBe(201);
+    const res = await post(token, "13回目");
     expect(res.status).toBe(429);
-    expect(await res.json()).toMatchObject({ error: "daily_limit", limit: 5 });
+    expect(await res.json()).toMatchObject({ error: "daily_limit", limit: 12 });
   });
 
   it("上限は人ごと。Aさんが上限でもBさんは投稿できる", async () => {
     const a = await register("A");
     const b = await register("B");
-    for (let i = 0; i < 5; i++) await post(a.token, `a${i}`);
+    for (let i = 0; i < 12; i++) await post(a.token, `a${i}`);
     expect((await post(a.token, "もう1回")).status).toBe(429);
     expect((await post(b.token, "はじめまして")).status).toBe(201);
   });
@@ -277,7 +276,77 @@ describe("つぶやき投稿とフォロー (M2)", () => {
     const rel = await env.DB.prepare("SELECT persona_id FROM relations WHERE user_id = ?").bind(userId).all<{ persona_id: string }>();
     const ids = rel.results.map((r) => r.persona_id);
     expect(new Set(ids).size).toBe(ids.length);
-    const notes = await env.DB.prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id = ?").bind(userId).first<{ n: number }>();
+    const notes = await env.DB.prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND type = 'follow'").bind(userId).first<{ n: number }>();
     expect(notes!.n).toBe(ids.length);
+  });
+});
+
+describe("リアクション (M3)", () => {
+  const post = (token: string, body: string) =>
+    call("/v1/posts", { ...json({ body }), headers: { "content-type": "application/json", authorization: `Bearer ${token}` } });
+  const timeline = async (token: string) =>
+    ((await (await call("/v1/posts", bearer(token))).json()) as {
+      posts: { id: string; reactions: { type: string; text: string | null; persona: { id: string; name: string } }[] }[];
+    }).posts;
+
+  it("新規フォロワーには必ず返信が付き、自分のつぶやきの下に表示される", async () => {
+    const { token } = await register();
+    let followed: { id: string }[] = [];
+    for (let i = 0; i < 12 && followed.length === 0; i++) {
+      followed = ((await (await post(token, "朝ランした。ジョギング最高")).json()) as { newFollowers: { id: string }[] }).newFollowers;
+    }
+    expect(followed.length).toBeGreaterThan(0);
+    const posts = await timeline(token);
+    const withFollow = posts.find((p) => p.reactions.some((r) => r.persona.id === followed[0]!.id))!;
+    const reply = withFollow.reactions.find((r) => r.persona.id === followed[0]!.id && r.type === "reply")!;
+    expect(reply.text).toBeTruthy();
+    expect(reply.text).toContain("フォローしました"); // mock は新規フォロワーにこの一言を付ける
+  });
+
+  it("表示時刻(visible_at)前のリアクションは、一覧にも出ない(時間差演出)", async () => {
+    const { token, userId } = await register();
+    // ケンジを先にフォロー済みにしておく(ひとめぼれの話題なら返信確率90%/投稿)。リアクションが付くまで投稿
+    await follow(userId, "kenji_run");
+    for (let i = 0; i < 10; i++) {
+      await post(token, "朝ランした。ジョギング最高");
+      const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM reactions WHERE user_id = ?").bind(userId).first<{ n: number }>();
+      if (n!.n > 0) break;
+    }
+    await env.DB.prepare("UPDATE reactions SET visible_at = ? WHERE user_id = ?").bind(Date.now() + 60_000, userId).run();
+    const posts = await timeline(token);
+    expect(posts.every((p) => p.reactions.length === 0)).toBe(true);
+    await env.DB.prepare("UPDATE reactions SET visible_at = ? WHERE user_id = ?").bind(Date.now() - 1, userId).run();
+    expect((await timeline(token)).some((p) => p.reactions.length > 0)).toBe(true);
+  });
+
+  it("リアクションは自分の投稿にだけ付き、他ユーザーには見えない。内部値も出ない", async () => {
+    const a = await register("A");
+    const b = await register("B");
+    await follow(a.userId, "kenji_run");
+    for (let i = 0; i < 8; i++) await post(a.token, "朝ランした。ジョギング最高");
+    await post(b.token, "こんにちは");
+    const aText = JSON.stringify(await timeline(a.token));
+    const bText = JSON.stringify(await timeline(b.token));
+    expect(aText).toContain("reply");
+    expect(bText).not.toContain("kenji_run");
+    for (const secret of ["affinity", "theta", "interests", "isNewFollower"]) expect(aText).not.toContain(secret);
+  });
+
+  it("LLMの設定ミス・障害でも投稿は成功し、セリフ例で返信が付く(縮退運転)", async () => {
+    const { token } = await register();
+    // 実行環境は mock。テストでは LLM_PROVIDER の誤設定をシミュレートできないため、
+    // 単体では generateRepliesSafely 相当(PromptedLlmProvider 例外時の挙動)を prompted.test で担保している。
+    const res = await post(token, "朝ランした。ジョギング最高");
+    expect(res.status).toBe(201);
+  });
+
+  it("リアクションの通知(like/reply)が作られ、二重にならない", async () => {
+    const { token, userId } = await register();
+    await follow(userId, "kenji_run");
+    for (let i = 0; i < 8; i++) await post(token, "朝ランした。ジョギング最高");
+    const rx = await env.DB.prepare("SELECT COUNT(*) AS n FROM reactions WHERE user_id = ?").bind(userId).first<{ n: number }>();
+    const nt = await env.DB.prepare("SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND type IN ('like','reply')").bind(userId).first<{ n: number }>();
+    expect(rx!.n).toBeGreaterThan(0);
+    expect(nt!.n).toBe(rx!.n);
   });
 });

@@ -11,6 +11,10 @@ import {
 import { PERSONAS, PERSONA_BY_ID, TOPIC_BY_ID } from "./data";
 import { decideFollows } from "./follow";
 import { createLlmProvider } from "./llm";
+import { MockLlmProvider } from "./llm/mock";
+import type { GeneratedReply, LlmProvider, ReplyTarget } from "./llm/provider";
+import { decideReactions } from "./reactions";
+import { loadReplyTargets } from "./targets";
 import { buildPersonaList, toPublic } from "./personaView";
 import { randomFor } from "./rng";
 import { analyzeByKeywords } from "./topics";
@@ -98,6 +102,24 @@ app.get("/v1/personas", requireUser, async (c) => {
 const MAX_POST_CHARS = 140;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** 返信生成。LLM の失敗・拒否・設定ミスでもアプリは止めず、ペルソナのセリフ例で代用する(SPEC §8) */
+async function generateRepliesSafely(
+  llm: LlmProvider,
+  post: { id: string; body: string },
+  topics: TopicWeight[],
+  targets: ReplyTarget[],
+): Promise<Map<string, string>> {
+  if (targets.length === 0) return new Map();
+  let list: GeneratedReply[];
+  try {
+    list = await llm.generateReplies({ post, topics, targets });
+  } catch (err) {
+    console.error("generateReplies failed; fallback to samples", err);
+    list = await new MockLlmProvider().generateReplies({ post, topics, targets });
+  }
+  return new Map(list.map((r) => [r.personaId, r.text]));
+}
+
 const labelTopics = (topics: TopicWeight[]) =>
   topics.map((t) => ({ tag: t.tag, label: TOPIC_BY_ID.get(t.tag)?.label ?? t.tag, weight: t.weight }));
 
@@ -121,10 +143,17 @@ app.post("/v1/posts", requireUser, async (c) => {
     .first<{ n: number }>();
   if ((recent?.n ?? 0) >= limit) return c.json({ error: "daily_limit", limit }, 429);
 
-  // 話題解析。LLM が失敗してもキーワード一致で続行する(縮退運転)
+  // LLM の用意と話題解析。設定ミス・障害・拒否があってもキーワード一致で続行する(縮退運転)
+  let llm: LlmProvider;
+  try {
+    llm = createLlmProvider(c.env);
+  } catch (err) {
+    console.error("createLlmProvider failed; fallback to mock", err);
+    llm = new MockLlmProvider();
+  }
   let topics: TopicWeight[];
   try {
-    topics = await createLlmProvider(c.env).analyzeTopics(text);
+    topics = await llm.analyzeTopics(text);
   } catch (err) {
     console.error("analyzeTopics failed; fallback to keywords", err);
     topics = analyzeByKeywords(text);
@@ -144,7 +173,24 @@ app.post("/v1/posts", requireUser, async (c) => {
     randFor: (personaId) => randomFor(postId, personaId),
   });
 
+  // リアクション(いいね・返信)の判定。フォロー済み全員+今回の新規フォロワーが対象
+  const newIds = new Set(decisions.map((d) => d.personaId));
+  const reactionPlan = decideReactions({
+    followers: PERSONAS.filter((p) => followed.has(p.id) || newIds.has(p.id)).map((persona) => ({
+      persona,
+      isNewFollower: newIds.has(persona.id),
+    })),
+    topics,
+    randFor: (key) => randomFor(postId, key),
+  });
+
+  // 返信の生成。このユーザーとの直近のやりとりだけを渡す(他ユーザーのデータは絶対に混ぜない)
+  const replyIds = reactionPlan.filter((r) => r.kind === "reply").map((r) => r.personaId);
+  const targets = await loadReplyTargets(db, userId, replyIds, newIds);
+  const replies = await generateRepliesSafely(llm, { id: postId, body: text }, topics, targets);
+
   // 保存(まとめて1回。フォローと通知は同時に走った投稿と重なっても二重にならない)
+  const delayMax = Number.parseInt(c.env.REACTION_DELAY_MAX_MS ?? "180000", 10) || 0;
   const stmts = [
     db
       .prepare("INSERT INTO posts (id, user_id, body, topics, created_at) VALUES (?, ?, ?, ?, ?)")
@@ -162,6 +208,20 @@ app.post("/v1/posts", requireUser, async (c) => {
           "INSERT OR IGNORE INTO notifications (id, user_id, type, ref_id, visible_at, created_at) VALUES (?, ?, 'follow', ?, ?, ?)",
         )
         .bind(`follow:${userId}:${d.personaId}`, userId, d.personaId, now, now),
+    );
+  }
+  for (const r of reactionPlan) {
+    const reactionId = `${postId}:${r.personaId}`;
+    // 表示のタイミングを人ごとにずらす(すぐ全員から返ってくる不自然さを避ける)。10秒〜最大遅延
+    const delay = delayMax > 0 ? Math.floor(10_000 + randomFor(postId, `delay:${r.personaId}`) * Math.max(0, delayMax - 10_000)) : 0;
+    const visibleAt = now + delay;
+    stmts.push(
+      db
+        .prepare("INSERT OR IGNORE INTO reactions (id, user_id, post_id, persona_id, type, text, visible_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(reactionId, userId, postId, r.personaId, r.kind, r.kind === "reply" ? (replies.get(r.personaId) ?? null) : null, visibleAt, now),
+      db
+        .prepare("INSERT OR IGNORE INTO notifications (id, user_id, type, ref_id, visible_at, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(`reaction:${reactionId}`, userId, r.kind, reactionId, visibleAt, now),
     );
   }
   await db.batch(stmts);
@@ -190,12 +250,37 @@ app.get("/v1/posts", requireUser, async (c) => {
   )
     .bind(c.var.userId, Number.isFinite(before) ? before : Number.MAX_SAFE_INTEGER, limit)
     .all<{ id: string; body: string; topics: string | null; created_at: number }>();
+  // 表示時刻(visible_at)を過ぎたリアクションだけを返す
+  const ids = rows.results.map((r) => r.id);
+  const byPost = new Map<string, unknown[]>();
+  if (ids.length > 0) {
+    const marks = ids.map(() => "?").join(",");
+    const rs = await c.env.DB.prepare(
+      `SELECT id, post_id, persona_id, type, text, visible_at FROM reactions WHERE user_id = ? AND visible_at <= ? AND post_id IN (${marks}) ORDER BY visible_at ASC`,
+    )
+      .bind(c.var.userId, Date.now(), ...ids)
+      .all<{ id: string; post_id: string; persona_id: string; type: string; text: string | null; visible_at: number }>();
+    for (const r of rs.results) {
+      const persona = PERSONA_BY_ID.get(r.persona_id);
+      if (!persona) continue;
+      const list = byPost.get(r.post_id) ?? [];
+      list.push({
+        id: r.id,
+        type: r.type,
+        text: r.text,
+        visibleAt: r.visible_at,
+        persona: { id: persona.id, name: persona.name, handle: persona.handle },
+      });
+      byPost.set(r.post_id, list);
+    }
+  }
   return c.json({
     posts: rows.results.map((r) => ({
       id: r.id,
       body: r.body,
       createdAt: r.created_at,
       topics: labelTopics(r.topics ? (JSON.parse(r.topics) as TopicWeight[]) : []),
+      reactions: byPost.get(r.id) ?? [],
     })),
   });
 });

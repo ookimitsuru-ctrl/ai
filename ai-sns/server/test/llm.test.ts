@@ -7,10 +7,17 @@ describe("LlmProvider (mock)", () => {
     expect(createLlmProvider({}).name).toBe("mock");
   });
 
-  it("未実装のプロバイダを指定すると明確なエラー", () => {
-    expect(() => createLlmProvider({ LLM_PROVIDER: "ollama" })).toThrow(/未実装/);
-    expect(() => createLlmProvider({ LLM_PROVIDER: "anthropic" })).toThrow(/未実装/);
+  it("設定が足りないと、何が足りないか分かるエラー", () => {
+    expect(() => createLlmProvider({ LLM_PROVIDER: "local" })).toThrow(/LLM_MODEL/);
+    expect(() => createLlmProvider({ LLM_PROVIDER: "ollama" })).toThrow(/LLM_MODEL/);
+    expect(() => createLlmProvider({ LLM_PROVIDER: "anthropic" })).toThrow(/ANTHROPIC_API_KEY/);
+    expect(() => createLlmProvider({ LLM_PROVIDER: "local", LLM_MODEL: "m", LLM_EXTRA_BODY: "{bad" })).toThrow(/JSON/);
     expect(() => createLlmProvider({ LLM_PROVIDER: "foo" })).toThrow(/未知/);
+  });
+
+  it("local / anthropic はそれぞれ作れる", () => {
+    expect(createLlmProvider({ LLM_PROVIDER: "local", LLM_MODEL: "qwen" }).name).toBe("local(qwen)");
+    expect(createLlmProvider({ LLM_PROVIDER: "anthropic", ANTHROPIC_API_KEY: "k" }).name).toBe("anthropic(claude-haiku-5-5)");
   });
 
   it("各ペルソナのセリフ例から、毎回同じ返信を返す", async () => {

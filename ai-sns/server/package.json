@@ -9,10 +9,12 @@
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "sim": "tsx scripts/simulate.ts",
+    "try-llm": "tsx scripts/try-llm.ts",
     "test": "vitest run",
     "db:local": "wrangler d1 migrations apply hitorigoto --local"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.7.0",
     "hono": "^4.13.0"
   },
   "devDependencies": {

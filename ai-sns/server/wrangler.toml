@@ -3,8 +3,13 @@ main = "src/index.ts"
 compatibility_date = "2026-11-01"
 
 [vars]
-# mock | ollama | anthropic (M1 は mock のみ実装)
+# mock | local | anthropic
+#   local     : ローカルLLM(OpenAI互換API。Ollama / LM Studio / llama.cpp / mlx-lm など)。
+#               LLM_MODEL と、必要なら LLM_BASE_URL(既定 http://localhost:11434/v1)を .dev.vars に書く
+#   anthropic : Claude Haiku 5.5。ANTHROPIC_API_KEY をシークレットに入れる
 LLM_PROVIDER = "mock"
+# リアクションが表示されるまでの最大遅延(ms)。0 なら即時
+REACTION_DELAY_MAX_MS = "180000"
 # 1ユーザーの24時間あたり投稿上限
 DAILY_POST_LIMIT = "10"
 
