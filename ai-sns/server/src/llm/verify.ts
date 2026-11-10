@@ -9,6 +9,9 @@ const FIRST_PERSON_GROUPS: string[][] = [["私", "わたし"], ["俺", "おれ"]
 const META_TERMS = ["AI", "人工知能", "言語モデル", "LLM", "ChatGPT", "Claude", "プロンプト", "システムプロンプト", "キャラ設定"];
 // 他ユーザーへの言及(SPEC §3.6)
 const OTHER_USER = /(他|ほか)の(人|ユーザー|方々?|フォロワー)|別のユーザー|他のみんな|他の皆/;
+// 現実で会う・一緒に何かする誘い(フォロワーは「SNSで見かけただけのよく知らない人」。リアルの友達ではない)
+const MEETUP =
+  /会おう|会いましょう|会いたい|会えたら|遊ぼう|遊びましょう|オフ会|一緒に(行こう|行きましょう|行きたい|やろう|やりましょう|飲もう|飲みましょう|食べよう|食べに|考えよう|考えたい|考えましょう|セッション)|今度(会|遊|飲|ご飯|一緒|セッション|やろ|行こ)/;
 const EMOJI = /\p{Extended_Pictographic}/u;
 
 function ownGroup(p: Persona): string[] | undefined {
@@ -38,6 +41,7 @@ export function verifyReply(persona: Persona, text: string, postBody = ""): stri
   const meta = META_TERMS.find((w) => t.includes(w) && !postBody.includes(w));
   if (meta) return `キャラを崩す語「${meta}」が含まれている`;
   if (OTHER_USER.test(t)) return "他のユーザーに言及している";
+  if (MEETUP.test(t)) return "現実で会う誘いをしている(よく知らない人との距離感に合わない)";
   return null;
 }
 

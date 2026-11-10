@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ANGLES, angleFor, assignAngles } from "../src/angles";
 import { PERSONAS } from "../src/data";
-import { repliesUser } from "../src/llm/prompts";
+import { REPLIES_SYSTEM, repliesUser } from "../src/llm/prompts";
 
 describe("返信の切り口", () => {
   it("同じ投稿・同じ人なら同じ切り口(やり直しても変わらない)", () => {
@@ -45,5 +45,23 @@ describe("調べた結果のプロンプト", () => {
     const u = repliesUser({ ...base, targets: [{ ...t, lookup: { label: "いま人気のゲーム(Steamの売れ筋)", items: ["A", "B", "C"] } }] });
     expect(u).toContain("調べた結果(いま人気のゲーム(Steamの売れ筋)): A / B / C");
     expect(repliesUser({ ...base, targets: [{ ...t, lookup: { label: "x", items: [] } }] })).not.toContain("調べた結果");
+  });
+});
+
+describe("距離感(SNSで見かけただけのよく知らない人)", () => {
+  it("AIへの指示に、距離感の決まりが入っている", () => {
+    for (const must of ["よく知らない人", "リアルの友達ではなく", "誘いはしない", "共有した過去を匂わせない", "世話を焼いたり"]) expect(REPLIES_SYSTEM).toContain(must);
+  });
+
+  it("20人のセリフ例・口癖・プロフィールに、会う誘いや私生活への踏み込みが無い", () => {
+    const MEET = /会おう|会いましょう|会いたい|遊ぼう|オフ会|一緒に(行|や|飲|食|考|セッション)|今度(会|遊|飲|ご飯|一緒|セッション|やろ|行こ)|ちゃんと(ご飯|食べ|保湿)/;
+    for (const p of PERSONAS) {
+      for (const text of [p.bio, p.speech.notes, ...p.samples, ...p.speech.catchphrases]) expect(text, `${p.id}: ${text}`).not.toMatch(MEET);
+    }
+  });
+
+  it("新規フォロワーへの指示は、馴れ馴れしくしない軽い一言", () => {
+    const u = repliesUser({ post: { id: "p", body: "走った" }, topics: [], targets: [{ persona: PERSONAS[0]!, isNewFollower: true, recentExchanges: [] }] });
+    expect(u).toContain("馴れ馴れしくしない");
   });
 });

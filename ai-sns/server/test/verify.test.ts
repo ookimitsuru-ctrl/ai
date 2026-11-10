@@ -45,4 +45,17 @@ describe("返信の検証", () => {
     expect(isVerbatimSample(kazu, "あ、えと…わかります。散歩いいですね")).toBe(false);
     expect(isVerbatimSample(kazu, "")).toBe(false);
   });
+
+  it("現実で会う誘い・一緒に何かする誘いは弾く(SNSで見かけただけの、よく知らない人という距離感)", () => {
+    const sou = p("sou_music");
+    for (const t of ["今度セッションしようぜ", "今度会おうぜ", "一緒に行きましょう", "オフ会しない?", "遊ぼうぜ", "今度ご飯行こう"]) {
+      expect(verifyReply(sou, t), t).toMatch(/会う誘い/);
+    }
+  });
+
+  it("自分の話としての「今度」や、ふつうの共感は弾かない", () => {
+    const sakura = p("sakura_cook");
+    expect(verifyReply(sakura, "それええやん!今度うちもやってみるわ〜")).toBeNull();
+    expect(verifyReply(p("erika_trip"), "いいなあ、その景色〜!私も行ってみたいな")).toBeNull();
+  });
 });
