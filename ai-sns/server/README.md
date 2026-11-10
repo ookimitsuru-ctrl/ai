@@ -7,7 +7,7 @@ Cloudflare Workers + D1 (TypeScript / Hono)。仕様は [`../SPEC.md`](../SPEC.m
 | 項目 | 場所 |
 |---|---|
 | フォロワー20人のマスタ | `data/personas.json` |
-| 話題タグ語彙(55タグ+キーワード) | `data/topics.json` |
+| 話題タグ語彙(60タグ+キーワード) | `data/topics.json` |
 | マスタの整合性チェック | `src/validate.ts`(テストで常時検証) |
 | 招待コード制の匿名登録 | `POST /v1/auth/register`、`POST /admin/invites` |
 | 自分の情報・データ削除 | `GET /v1/me`、`DELETE /v1/me` |
