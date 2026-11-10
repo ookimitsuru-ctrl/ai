@@ -17,7 +17,16 @@ import type { TopicWeight } from "./types";
 
 const app = new Hono<AppBindings>();
 
-app.get("/healthz", (c) => c.json({ ok: true }));
+// 動作確認用。サーバーが今どのAIで答えているかが分かる(鍵や接続先は出さない)
+app.get("/healthz", (c) =>
+  c.json({
+    ok: true,
+    llm: { provider: c.env.LLM_PROVIDER ?? "mock", model: c.env.LLM_MODEL ?? null },
+    lookup: c.env.LOOKUP_ENABLED === "true",
+    news: c.env.NEWS_ENABLED === "true",
+    replyMode: c.env.REPLY_MODE ?? "async",
+  }),
+);
 
 // ---------- 登録(招待コード+匿名ログイン) ----------
 // 個人情報は取らない。ニックネームは任意。端末にはトークンだけを保存する。

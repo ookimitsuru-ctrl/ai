@@ -3,6 +3,7 @@ import { assignAngles } from "./angles";
 import { decideFollows } from "./follow";
 import { createLlmProvider } from "./llm";
 import { MockLlmProvider } from "./llm/mock";
+import { PromptedLlmProvider } from "./llm/prompted";
 import type { GeneratedReply, LlmProvider, ReplyTarget } from "./llm/provider";
 import { decideReactions } from "./reactions";
 import { randomFor } from "./rng";
@@ -28,7 +29,26 @@ export async function generateRepliesSafely(
     console.error("generateReplies failed; fallback to samples", err);
     list = await new MockLlmProvider().generateReplies({ kind, post, topics, targets });
   }
+  logReplySummary(llm, kind, targets.length, list);
   return new Map(list.map((r) => [r.personaId, r.text]));
+}
+
+/**
+ * 返信がどう作られたかを、サーバーの画面に1行で出す(「噛み合わない」ときの原因の切り分け用)。
+ * - mock: AIを使っていない(決まったセリフ)
+ * - 「代用」が多い: AIの出力が基準を満たさず、セリフ例で代わりに答えた
+ */
+function logReplySummary(llm: LlmProvider, kind: string, n: number, list: GeneratedReply[]): void {
+  if (llm instanceof PromptedLlmProvider) {
+    const d = llm.lastDiagnostics;
+    const sample = d.filter((x) => x.source === "sample").length;
+    const retried = d.filter((x) => x.source === "llm" && x.attempts > 1).length;
+    const why = d.flatMap((x) => x.rejected).slice(0, 3).join(" / ");
+    console.log(`[reply] ${llm.name} ${kind} ${n}人: AI=${d.length - sample} 再生成=${retried} セリフ例で代用=${sample}${why ? ` (却下理由: ${why})` : ""}`);
+  } else {
+    const fallback = list.filter((r) => r.mood === "fallback").length;
+    console.log(`[reply] ${llm.name} ${kind} ${n}人${llm.name === "mock" ? ": AIは使っていません(決まったセリフです)" : ""}${fallback ? ` セリフ例で代用=${fallback}` : ""}`);
+  }
 }
 
 /** 人ごとの表示遅延(ms)。10秒〜最大遅延の間でずらし、同じ投稿なら同じ値になる。最大遅延が0なら即時 */

@@ -128,3 +128,14 @@ describe("データ削除", () => {
     expect((await call("/v1/me", bearer(b.token))).status).toBe(200);
   });
 });
+
+describe("動作確認用の /healthz", () => {
+  it("サーバーが今どのAIで答えているか分かり、鍵や接続先は出ない", async () => {
+    const res = await call("/healthz");
+    const body = (await res.json()) as { ok: boolean; llm: { provider: string; model: string | null } };
+    expect(body.ok).toBe(true);
+    expect(body.llm).toEqual({ provider: "mock", model: null });
+    const text = JSON.stringify(body);
+    for (const secret of ["TOKEN_SECRET", "ADMIN_KEY", "ANTHROPIC", "http", "test-token-secret"]) expect(text).not.toContain(secret);
+  });
+});
