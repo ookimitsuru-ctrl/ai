@@ -60,6 +60,14 @@ LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+### 動作確認済みの組み合わせ
+
+| 環境 | 設定 | 結果 |
+|---|---|---|
+| Mac mini M5 Pro 48GB + kapitsa + `qwen3.8-27b:8bit`(思考オフ) | `LLM_BASE_URL=http://localhost:8000/v1`、`LLM_EXTRA_BODY={"chat_template_kwargs":{"enable_thinking":false}}` | 話題解析 4.7秒、返信1人分 7.4秒。ケンジの口調(「っす」「俺」)が出て、検証も1回目で合格 |
+
+kapitsa は OpenAI 互換(`/v1/models`、`/v1/chat/completions`)。思考をオフにしないと話題解析だけで長くかかる。
+
 ### 手元のLLMが実用になるか試す(サーバー不要)
 
 ```sh

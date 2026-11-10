@@ -1,3 +1,10 @@
 # コピーして .dev.vars にする(.dev.vars はコミットしない)
 TOKEN_SECRET=change-me-to-a-long-random-string
 ADMIN_KEY=change-me-too
+
+# --- ローカルLLM(kapitsa)で動作確認できた設定 ---
+# LLM_PROVIDER=local
+# LLM_BASE_URL=http://localhost:8000/v1
+# LLM_MODEL=qwen3.8-27b:8bit
+# LLM_EXTRA_BODY={"chat_template_kwargs":{"enable_thinking":false}}
+# LLM_TIMEOUT_MS=300000
