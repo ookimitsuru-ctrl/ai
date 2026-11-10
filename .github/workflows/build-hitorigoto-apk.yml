@@ -1,0 +1,27 @@
+name: Build ひとりごと (Android)
+on:
+  push:
+    paths: ['ai-sns/android/**', '.github/workflows/build-hitorigoto-apk.yml']
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      LC_ALL: C.UTF-8   # 日本語のテスト名(クラスファイル名)を扱うため
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Test and build
+        working-directory: ai-sns/android
+        run: ./gradlew testDebugUnitTest assembleDebug --console=plain
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hitorigoto-debug-apk
+          path: ai-sns/android/app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-reports
+          path: ai-sns/android/app/build/reports/tests/

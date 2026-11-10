@@ -6,6 +6,7 @@
   "description": "ひとりごと(AIフォロワーSNS)のサーバー。Cloudflare Workers + D1",
   "scripts": {
     "dev": "wrangler dev",
+    "dev:lan": "wrangler dev --ip 0.0.0.0",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "sim": "tsx scripts/simulate.ts",
