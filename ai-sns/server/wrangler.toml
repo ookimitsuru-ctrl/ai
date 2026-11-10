@@ -1,0 +1,18 @@
+name = "hitorigoto"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+
+[vars]
+# mock | ollama | anthropic (M1 は mock のみ実装)
+LLM_PROVIDER = "mock"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hitorigoto"
+# 本番デプロイ前に `wrangler d1 create hitorigoto` で発行した ID に置き換える
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+# シークレット(コミットしない):
+#   ローカル: .dev.vars に TOKEN_SECRET=... / ADMIN_KEY=... を書く
+#   本番    : wrangler secret put TOKEN_SECRET / ADMIN_KEY
