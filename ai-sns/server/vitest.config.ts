@@ -15,6 +15,7 @@ export default defineConfig(async () => {
             ADMIN_KEY: "test-admin-key",
             DAILY_POST_LIMIT: "12",
             REACTION_DELAY_MAX_MS: "0",
+            REPLY_MODE: "sync",
           },
         },
       }),

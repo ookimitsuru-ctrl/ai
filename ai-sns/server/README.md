@@ -1,4 +1,4 @@
-# ひとりごと サーバー (M1〜M3)
+# ひとりごと サーバー (M1〜M4)
 
 Cloudflare Workers + D1 (TypeScript / Hono)。仕様は [`../SPEC.md`](../SPEC.md)。
 
@@ -11,7 +11,10 @@ Cloudflare Workers + D1 (TypeScript / Hono)。仕様は [`../SPEC.md`](../SPEC.m
 | マスタの整合性チェック | `src/validate.ts`(テストで常時検証) |
 | 招待コード制の匿名登録 | `POST /v1/auth/register`、`POST /admin/invites` |
 | 自分の情報・データ削除 | `GET /v1/me`、`DELETE /v1/me` |
-| **つぶやき投稿(話題解析→フォロー判定→保存)** | `POST /v1/posts`、`GET /v1/posts` |
+| **つぶやき投稿**(即返答。解析・フォロー判定・返信生成は裏で処理) | `POST /v1/posts`、`src/processPost.ts` |
+| 自分のつぶやき一覧(処理状況・表示時刻を過ぎたリアクション付き) | `GET /v1/posts` |
+| **通知**(新規フォロー・いいね・返信)と既読 | `GET /v1/notifications`、`POST /v1/notifications/read` |
+| 止まった投稿の自動救済(AIなしの縮退運転) | `recoverStuckPosts`(一覧・通知の読み出し時に実行) |
 | フォロー判定ロジックと調整用パラメータ | `src/follow.ts` |
 | フォローの増え方のシミュレーション | `npm run sim`(`scripts/`) |
 | 1日の投稿上限(既定10回/24時間) | `DAILY_POST_LIMIT` |
@@ -23,7 +26,7 @@ Cloudflare Workers + D1 (TypeScript / Hono)。仕様は [`../SPEC.md`](../SPEC.m
 | キーワード話題解析(LLM障害時の縮退運転にも使う) | `src/topics.ts` |
 | DBスキーマ | `migrations/0001_init.sql` |
 
-まだ無いもの: 通知の取得API・フォローの時間差表示(M4)、ユーザーの返信への返信(スレッド会話)。
+まだ無いもの: プッシュ通知(FCM)、ユーザーの返信への返信(スレッド会話)、Androidアプリ本体。
 **未確認: 実機のモデル(ローカルLLM / Haiku)での口調の品質。** コードとテストは完了しているが、実モデルでの確認は `npm run try-llm` でこれから行う。
 
 ## セットアップ
@@ -79,7 +82,24 @@ LLM_PROVIDER=local LLM_BASE_URL=http://localhost:11434/v1 LLM_MODEL=<モデル�
 口調がキャラらしいか(語尾・一人称・長さ・キャラ同士の違い)は、出力を見て判断する。
 `--personas=kenji_run,miyu_cafe` で返信する人を指定できる。
 
-> 注意: 現状 `POST /v1/posts` は返信の生成が終わるまで待つ。ローカルLLMが遅い場合は `LLM_TIMEOUT_MS` と、アプリ側の待ち時間に注意(M4 で非同期化を検討)。
+> `POST /v1/posts` は保存してすぐ返る(約15ms)。解析と返信の生成は裏で行い、結果はリアクション・通知の表示時刻(10秒〜最大3分後)になったものから見える。`REPLY_MODE=sync` にすると、デバッグ用に完了まで待つ。
+
+## API 一覧
+
+すべて `Authorization: Bearer <token>` が必要(登録を除く)。
+
+| メソッド | パス | 内容 |
+|---|---|---|
+| POST | `/v1/auth/register` | `{inviteCode, nickname?}` → `{userId, token}` |
+| GET / DELETE | `/v1/me` | 自分の情報(表示中のフォロワー数)/ 全データ削除 |
+| GET | `/v1/personas` | 20枠(未フォローは `{slot, locked:true}`)。表示時刻を過ぎたフォロワーだけ解放 |
+| POST | `/v1/posts` | `{body}`(140字以内)→ `{post:{id, body, createdAt}}` |
+| GET | `/v1/posts?limit=&before=` | つぶやき一覧。`status`(`processing`/`done`)、`topics`、表示時刻を過ぎた `reactions` |
+| GET | `/v1/notifications?limit=&before=` | `{notifications:[{id, type: follow/like/reply, createdAt, read, persona, postId?, text?}], unreadCount}` |
+| POST | `/v1/notifications/read` | `{ids:[…]}`(最大100)または `{all:true}` → `{unreadCount}` |
+| POST | `/admin/invites` | `x-admin-key` ヘッダが必要。招待コードの発行 |
+
+アプリは、投稿後に `GET /v1/posts` と `GET /v1/notifications` を一定間隔で取りに行く(プッシュ通知を入れるまでの間)。
 
 ## 動作確認(curl)
 
@@ -106,6 +126,7 @@ curl -s localhost:8787/v1/personas -H 'authorization: Bearer <token>'
 - `/v1/personas` は `src/personaView.ts` を通した公開情報だけを返す。`interests` / `theta` / `speech` / `samples` などの内部設定と、未フォローのペルソナの名前・IDは返さない(テストで確認済み)。
 - フォロー解除の処理は存在しない。
 - 投稿APIは内部値(親和度・確率)を返さない。
+- 通知・リアクション・フォローは、表示時刻を過ぎたものだけがAPIに出る。他ユーザーの通知は見えず、既読にもできない(テストで確認済み)。
 - 返信生成に渡す「直近のやりとり」は、そのユーザー自身のものだけ(`src/targets.ts`、テストで確認済み)。`relations` を消すのはアカウント削除時のみ。
 
 ## 本番デプロイ前にやること

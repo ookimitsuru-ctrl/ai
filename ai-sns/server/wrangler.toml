@@ -8,6 +8,8 @@ compatibility_date = "2026-11-01"
 #               LLM_MODEL と、必要なら LLM_BASE_URL(既定 http://localhost:11434/v1)を .dev.vars に書く
 #   anthropic : Claude Haiku 5.5。ANTHROPIC_API_KEY をシークレットに入れる
 LLM_PROVIDER = "mock"
+# async: 投稿はすぐ返し、解析と返信生成は裏で行う / sync: 完了まで待つ(デバッグ用)
+REPLY_MODE = "async"
 # リアクションが表示されるまでの最大遅延(ms)。0 なら即時
 REACTION_DELAY_MAX_MS = "180000"
 # 1ユーザーの24時間あたり投稿上限

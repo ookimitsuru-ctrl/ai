@@ -22,6 +22,10 @@ export interface Env {
   LLM_TIMEOUT_MS?: string;
   /** anthropic: APIキー(シークレット。アプリには入れない) */
   ANTHROPIC_API_KEY?: string;
+  /** async(既定): 投稿はすぐ返し、解析と返信生成は裏で行う / sync: 完了まで待つ(テスト・デバッグ用) */
+  REPLY_MODE?: string;
+  /** 処理中のまま、この時間(ms、既定 90000)を過ぎた投稿は、AI を使わない縮退運転で完了させる */
+  STUCK_POST_MS?: string;
   /** リアクションが表示されるまでの最大遅延(ms、既定 180000。0なら即時) */
   REACTION_DELAY_MAX_MS?: string;
   /** テスト用 */
