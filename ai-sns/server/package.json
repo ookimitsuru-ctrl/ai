@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "sim": "tsx scripts/simulate.ts",
     "try-llm": "tsx scripts/try-llm.ts",
+    "try-lookup": "tsx scripts/try-lookup.ts",
     "test": "vitest run",
     "db:local": "wrangler d1 migrations apply hitorigoto --local"
   },

@@ -26,6 +26,16 @@ export interface Env {
   REPLY_MODE?: string;
   /** 処理中のまま、この時間(ms、既定 90000)を過ぎた投稿は、AI を使わない縮退運転で完了させる */
   STUCK_POST_MS?: string;
+  /** true なら、会話で「おすすめ」「ないかな」と聞かれたとき、ネットで人気のものを調べて返事に使う(既定 false) */
+  LOOKUP_ENABLED?: string;
+  /** true なら、ニュースの見出しを取ってきて、返信の話題に使う(既定 false) */
+  NEWS_ENABLED?: string;
+  /** ニュースRSSのURL。{q} が検索語に置き換わる。既定は Google ニュースの検索RSS(日本語) */
+  NEWS_RSS_URL?: string;
+  /** ニュースを返信に使う確率(既定 0.35) */
+  NEWS_USE_RATE?: string;
+  /** 1ユーザーの24時間あたりスレッド発言上限(既定 30) */
+  THREAD_DAILY_LIMIT?: string;
   /** リアクションが表示されるまでの最大遅延(ms、既定 180000。0なら即時) */
   REACTION_DELAY_MAX_MS?: string;
   /** テスト用 */

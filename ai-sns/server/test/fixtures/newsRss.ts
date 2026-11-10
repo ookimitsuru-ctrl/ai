@@ -1,0 +1,36 @@
+// Google ニュースの検索RSSの形を模した見本(test/fixtures/news.rss.xml と同じ内容)
+export const NEWS_RSS = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <generator>NFE/5.0</generator>
+    <title>"ランニング" - Google ニュース</title>
+    <item>
+      <title>東京マラソン、ボランティアの募集を開始 - スポーツ新報</title>
+      <link>https://news.example.invalid/a</link>
+      <pubDate>Tue, 10 Nov 2026 01:00:00 GMT</pubDate>
+      <source url="https://sports.example.invalid">スポーツ新報</source>
+    </item>
+    <item>
+      <title><![CDATA[初心者向けランニングシューズ特集 &amp; 選び方 - くらしの手帖]]></title>
+      <link>https://news.example.invalid/b</link>
+      <source url="https://kurashi.example.invalid">くらしの手帖</source>
+    </item>
+    <item>
+      <title>マラソン大会で転倒事故、複数人が搬送 - 夕刊ニュース</title>
+      <source url="https://yukan.example.invalid">夕刊ニュース</source>
+    </item>
+    <item>
+      <title>短い</title>
+      <source url="https://x.example.invalid">X</source>
+    </item>
+    <item>
+      <title>東京マラソン、ボランティアの募集を開始 - 別の媒体</title>
+      <source url="https://other.example.invalid">別の媒体</source>
+    </item>
+    <item>
+      <title>【PR】今すぐ買える最新ランニングウォッチ - 広告社</title>
+      <source url="https://ad.example.invalid">広告社</source>
+    </item>
+  </channel>
+</rss>
+`;

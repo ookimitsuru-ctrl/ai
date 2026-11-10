@@ -1,28 +1,32 @@
 import { PERSONAS } from "./data";
+import { assignAngles } from "./angles";
 import { decideFollows } from "./follow";
 import { createLlmProvider } from "./llm";
 import { MockLlmProvider } from "./llm/mock";
 import type { GeneratedReply, LlmProvider, ReplyTarget } from "./llm/provider";
 import { decideReactions } from "./reactions";
 import { randomFor } from "./rng";
+import { lookupForText } from "./lookup";
+import { loadHeadlines, newsEnabled, pickHeadline, refreshNewsForTags } from "./news";
 import { loadReplyTargets } from "./targets";
 import { analyzeByKeywords } from "./topics";
 import type { Env, TopicWeight } from "./types";
 
 /** 返信生成。LLM の失敗・拒否・設定ミスでもアプリは止めず、ペルソナのセリフ例で代用する(SPEC §8) */
-async function generateRepliesSafely(
+export async function generateRepliesSafely(
   llm: LlmProvider,
   post: { id: string; body: string },
   topics: TopicWeight[],
   targets: ReplyTarget[],
+  kind: "post" | "thread" = "post",
 ): Promise<Map<string, string>> {
   if (targets.length === 0) return new Map();
   let list: GeneratedReply[];
   try {
-    list = await llm.generateReplies({ post, topics, targets });
+    list = await llm.generateReplies({ kind, post, topics, targets });
   } catch (err) {
     console.error("generateReplies failed; fallback to samples", err);
-    list = await new MockLlmProvider().generateReplies({ post, topics, targets });
+    list = await new MockLlmProvider().generateReplies({ kind, post, topics, targets });
   }
   return new Map(list.map((r) => [r.personaId, r.text]));
 }
@@ -101,6 +105,16 @@ export async function processPost(env: Env, postId: string, opts: { degraded?: b
   // 返信生成(このユーザーとの直近のやりとりだけを渡す)
   const replyIds = plan.filter((r) => r.kind === "reply").map((r) => r.personaId);
   const targets = await loadReplyTargets(db, userId, replyIds, newIds);
+  // 切り口を人ごとに変える(同じ調子の返信が並ばないように)
+  const angles = assignAngles(postId, replyIds);
+  for (const t of targets) t.angle = angles.get(t.persona.id);
+  // ニュースの見出し・頼まれた調べもの(有効なときだけ。取れなければ何も付けない)
+  if (!opts.degraded) {
+    await attachNews(env, postId, topics, targets);
+    // 「面白いゲームないかな」のように聞かれたら、人気のものを調べて、返信する全員に渡す(使うかは各キャラの好み次第)
+    const lookup = await lookupForText(env, post.body, topics);
+    if (lookup) for (const t of targets) t.lookup = { label: lookup.label, items: lookup.items };
+  }
   const replies = await generateRepliesSafely(llm, { id: postId, body: post.body }, topics, targets);
 
   // 保存(1回のバッチ。やり直しても二重にならないよう、IDは投稿ID+ペルソナIDで決める)
@@ -171,4 +185,26 @@ export async function recoverStuckPosts(env: Env, userId: string): Promise<Promi
     }
   }
   return jobs;
+}
+
+/**
+ * 返信するキャラのうち一部に、ニュースの見出しを1つずつ渡す。
+ * 使うかどうかは投稿IDから決まる確率(NEWS_USE_RATE、既定35%)。外に出す検索語は話題タグだけ。
+ */
+async function attachNews(env: Env, postId: string, topics: TopicWeight[], targets: ReplyTarget[]): Promise<void> {
+  if (!newsEnabled(env) || targets.length === 0) return;
+  try {
+    const rate = Number.parseFloat(env.NEWS_USE_RATE ?? "0.35");
+    const wanting = targets.filter((t) => randomFor(postId, `news:${t.persona.id}`) < (Number.isFinite(rate) ? rate : 0.35));
+    if (wanting.length === 0) return;
+    const tags = [...topics.map((t) => t.tag), ...wanting.flatMap((t) => t.persona.interests.strong)];
+    await refreshNewsForTags(env, tags);
+    const headlines = await loadHeadlines(env.DB, [...topics.map((t) => t.tag), ...wanting.flatMap((t) => [...t.persona.interests.strong, ...t.persona.interests.mid])]);
+    for (const t of wanting) {
+      const h = pickHeadline(t.persona, topics, headlines, () => randomFor(postId, `newspick:${t.persona.id}`));
+      if (h) t.newsHint = h;
+    }
+  } catch (err) {
+    console.error("attachNews failed; continue without news", err);
+  }
 }

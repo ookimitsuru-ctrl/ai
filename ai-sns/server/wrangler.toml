@@ -10,6 +10,13 @@ compatibility_date = "2026-11-01"
 LLM_PROVIDER = "mock"
 # async: 投稿はすぐ返し、解析と返信生成は裏で行う / sync: 完了まで待つ(デバッグ用)
 REPLY_MODE = "async"
+# 会話で「面白いゲームないかな」「おすすめ教えて」と聞かれたとき、ネットで人気のもの(Steam・AniList・Apple Music)を調べて返事に使う。
+# ユーザーの言葉は外に送らない(固定の公開APIを呼ぶだけ)。対象はゲーム・アニメ・漫画・音楽
+LOOKUP_ENABLED = "false"
+# ニュースの見出しを取ってきて、返信の話題に使う(true で有効)。検索語は話題タグだけで、ユーザーの投稿は外に送らない
+NEWS_ENABLED = "false"
+# 1ユーザーの24時間あたりのスレッド発言の上限
+THREAD_DAILY_LIMIT = "30"
 # リアクションが表示されるまでの最大遅延(ms)。0 なら即時
 REACTION_DELAY_MAX_MS = "180000"
 # 1ユーザーの24時間あたり投稿上限

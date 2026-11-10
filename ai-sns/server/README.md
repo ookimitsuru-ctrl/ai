@@ -1,4 +1,4 @@
-# ひとりごと サーバー (M1〜M4)
+# ひとりごと サーバー (M1〜M5)
 
 Cloudflare Workers + D1 (TypeScript / Hono)。仕様は [`../SPEC.md`](../SPEC.md)。
 
@@ -14,7 +14,12 @@ Cloudflare Workers + D1 (TypeScript / Hono)。仕様は [`../SPEC.md`](../SPEC.m
 | **つぶやき投稿**(即返答。解析・フォロー判定・返信生成は裏で処理) | `POST /v1/posts`、`src/processPost.ts` |
 | 自分のつぶやき一覧(処理状況・表示時刻を過ぎたリアクション付き) | `GET /v1/posts` |
 | **通知**(新規フォロー・いいね・返信)と既読 | `GET /v1/notifications`、`POST /v1/notifications/read` |
-| 止まった投稿の自動救済(AIなしの縮退運転) | `recoverStuckPosts`(一覧・通知の読み出し時に実行) |
+| **フォロワーの返信へのいいね** | `PUT/DELETE /v1/reactions/:id/like` |
+| **スレッド**(フォロワーの返信に返信すると、同じフォロワーが続きの返事をする) | `POST /v1/reactions/:id/messages`、`src/thread.ts` |
+| **返信の切り口**(共感・質問・豆知識…を人ごとに変えて単調さを防ぐ) | `src/angles.ts` |
+| **会話の中の調べもの**(「面白いゲームないかな」→ 人気のゲームを調べて返事に使う) | `src/lookup.ts`、`LOOKUP_ENABLED` |
+| ニュース見出しを話題に使う(任意・既定オフ) | `src/news.ts`、`NEWS_ENABLED` |
+| 止まった投稿・スレッドの自動救済(AIなしの縮退運転) | `recoverStuckPosts`(一覧・通知の読み出し時に実行) |
 | フォロー判定ロジックと調整用パラメータ | `src/follow.ts` |
 | フォローの増え方のシミュレーション | `npm run sim`(`scripts/`) |
 | 1日の投稿上限(既定10回/24時間) | `DAILY_POST_LIMIT` |
@@ -94,12 +99,29 @@ LLM_PROVIDER=local LLM_BASE_URL=http://localhost:11434/v1 LLM_MODEL=<モデル�
 | GET / DELETE | `/v1/me` | 自分の情報(表示中のフォロワー数)/ 全データ削除 |
 | GET | `/v1/personas` | 20枠(未フォローは `{slot, locked:true}`)。表示時刻を過ぎたフォロワーだけ解放 |
 | POST | `/v1/posts` | `{body}`(140字以内)→ `{post:{id, body, createdAt}}` |
-| GET | `/v1/posts?limit=&before=` | つぶやき一覧。`status`(`processing`/`done`)、`topics`、表示時刻を過ぎた `reactions` |
-| GET | `/v1/notifications?limit=&before=` | `{notifications:[{id, type: follow/like/reply, createdAt, read, persona, postId?, text?}], unreadCount}` |
+| GET | `/v1/posts?limit=&before=` | つぶやき一覧。`status`(`processing`/`done`)、`topics`、表示時刻を過ぎた `reactions`(返信には `liked`、`thread`(会話)、`replying`(返事を作っている最中)が付く) |
+| GET | `/v1/notifications?limit=&before=` | `{notifications:[{id, type: follow/like/reply, createdAt, read, persona, postId?, reactionId?(どのスレッドか), text?}], unreadCount}` |
 | POST | `/v1/notifications/read` | `{ids:[…]}`(最大100)または `{all:true}` → `{unreadCount}` |
+| PUT / DELETE | `/v1/reactions/:id/like` | フォロワーの返信にいいね / 取り消し(自分宛ての、表示済みの返信だけ) |
+| POST | `/v1/reactions/:id/messages` | `{body}`(140字以内)。スレッドに発言。フォロワーの返事は裏で作られ、数秒〜30秒後に現れる。返事待ちの間は 409、1スレッド20回・1日30回まで |
 | POST | `/admin/invites` | `x-admin-key` ヘッダが必要。招待コードの発行 |
 
 アプリは、投稿後に `GET /v1/posts` と `GET /v1/notifications` を一定間隔で取りに行く(プッシュ通知を入れるまでの間)。
+
+## 会話に幅を持たせる(M5)
+
+| 仕組み | 内容 | 設定 |
+|---|---|---|
+| 切り口 | 返信ごとに「共感」「質問を返す」「体験談」「豆知識」「ツッコミ」「励まし」「誘い」「感想」を割り当てる。同時に返信する人は、なるべく別々の切り口になる。AI不要・費用ゼロ | 常に有効 |
+| 調べもの | 相手が「面白いゲームないかな」「おすすめ教えて」と**頼んだとき**だけ、ネットで人気のものを調べて、キャラが自分の好みに合うものを選んで話す。対象はゲーム(Steamの売れ筋)・アニメ/漫画(AniListのトレンド)・音楽(Apple Musicの再生ランキング)。結果は3時間キャッシュ。つぶやきでもスレッドでも使える | `LOOKUP_ENABLED=true` |
+| ニュース見出し | 返信の一部に、話題タグに合う最近の見出し(暗い話題は除外)を渡す。任意 | `NEWS_ENABLED=true`、`NEWS_USE_RATE`(既定0.35) |
+
+**プライバシー**: どちらも **ユーザーの言葉は外に送らない**。調べもの先は話題ごとに決まった公開APIで、送るのは固定のリクエストだけ。ニュースの検索語も話題タグの名前だけ。取得に失敗しても、普通の返信になるだけ。
+
+```sh
+npm run try-lookup                      # 実際のネットで取れるか確認(サーバー不要)。応答の形が違えば教えてください
+npm run try-lookup -- --news=running    # ニュースRSSも試す
+```
 
 ## 動作確認(curl)
 
