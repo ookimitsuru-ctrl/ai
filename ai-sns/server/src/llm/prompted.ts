@@ -5,7 +5,7 @@ import { REPLIES_SCHEMA_NAME, TOPICS_SCHEMA_NAME, repliesSchema, topicsSchema } 
 import { REPLIES_SYSTEM, TOPICS_SYSTEM, repliesUser, topicsUser } from "./prompts";
 import type { GeneratedReply, LlmProvider, ReplyRequest, ReplyTarget } from "./provider";
 import type { JsonTransport } from "./transport";
-import { verifyReply } from "./verify";
+import { isVerbatimSample, verifyReply } from "./verify";
 
 /** 返信が基準を満たさないときの再生成回数(SPEC §5.5: 最大2回) */
 const MAX_RETRIES = 2;
@@ -65,7 +65,10 @@ export class PromptedLlmProvider implements LlmProvider {
         const d = diag.get(target.persona.id)!;
         d.attempts += 1;
         const text = got.get(target.persona.id)?.trim();
-        const problem = text ? verifyReply(target.persona, text, req.post.body) : "返信が返ってこなかった";
+        const problem = text
+          ? (verifyReply(target.persona, text, req.post.body) ??
+            (isVerbatimSample(target.persona, text) ? "セリフ例の丸写し" : null))
+          : "返信が返ってこなかった";
         if (!problem && text) {
           done.set(target.persona.id, { personaId: target.persona.id, text });
         } else {

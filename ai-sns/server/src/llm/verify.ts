@@ -40,3 +40,15 @@ export function verifyReply(persona: Persona, text: string, postBody = ""): stri
   if (OTHER_USER.test(t)) return "他のユーザーに言及している";
   return null;
 }
+
+/** 句読点・記号・空白を除いて比べるための正規化 */
+const normalize = (t: string) => t.replace(/[\s、。,.!?!?~〜…・「」]/gu, "");
+
+/**
+ * 返信がセリフ例の完全な丸写しか。口癖の一部を使うのは許容し、文全体が同じ場合だけ true。
+ * (毎回同じ文が出ると、すぐ飽きられるため。再生成の対象にする)
+ */
+export function isVerbatimSample(persona: Persona, text: string): boolean {
+  const t = normalize(text);
+  return t.length > 0 && persona.samples.some((s) => normalize(s) === t);
+}

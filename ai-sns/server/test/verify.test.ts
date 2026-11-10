@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PERSONA_BY_ID, PERSONAS } from "../src/data";
-import { verifyReply } from "../src/llm/verify";
+import { isVerbatimSample, verifyReply } from "../src/llm/verify";
 
 const p = (id: string) => PERSONA_BY_ID.get(id)!;
 
@@ -36,5 +36,13 @@ describe("返信の検証", () => {
 
   it("つぶやき自体がAIの話題なら、AIという語は許容する", () => {
     expect(verifyReply(p("dai_dev"), "AIの話、気になるな", "最近AIの勉強をしてる")).toBeNull();
+  });
+
+  it("セリフ例の丸写しだけを検出する(句読点の違いは無視、一部の使用は許容)", () => {
+    const kazu = p("kazu_lonely");
+    expect(isVerbatimSample(kazu, "あ、えと…わかります。僕もそうなので")).toBe(true);
+    expect(isVerbatimSample(kazu, "あ、えと…わかります 僕もそうなので")).toBe(true);
+    expect(isVerbatimSample(kazu, "あ、えと…わかります。散歩いいですね")).toBe(false);
+    expect(isVerbatimSample(kazu, "")).toBe(false);
   });
 });

@@ -72,6 +72,18 @@ describe("返信生成(LLM)", () => {
     expect(llm.lastDiagnostics[0]!.source).toBe("sample");
   });
 
+  it("セリフ例の丸写しは再生成する(口癖の一部を使うのはOK)", async () => {
+    const t = scripted([
+      { replies: [{ personaId: "kazu_lonely", text: "あ、えと…わかります。僕もそうなので" }] }, // セリフ例そのまま
+      { replies: [{ personaId: "kazu_lonely", text: "あ、えと…朝の散歩、いいですよね。僕も歩きたくなりました" }] }, // 口癖は使うが新しい文
+    ]);
+    const llm = new PromptedLlmProvider(t);
+    const [r] = await llm.generateReplies({ post, topics: [], targets: [target("kazu_lonely")] });
+    expect(r!.text).toBe("あ、えと…朝の散歩、いいですよね。僕も歩きたくなりました");
+    expect(t.calls).toHaveLength(2);
+    expect(llm.lastDiagnostics[0]!.rejected).toEqual(["セリフ例の丸写し"]);
+  });
+
   it("返ってこなかった人は再生成、依頼していない人の返信は無視", async () => {
     const t = scripted([
       { replies: [{ personaId: "miyu_cafe", text: "わぁ…素敵ですぅ" }] }, // ケンジ分が無い+頼んでいない人
