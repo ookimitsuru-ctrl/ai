@@ -6,7 +6,7 @@
  * 実際の公開APIの応答の形が、想定と違っていないかの確認用。取れた件数と中身を表示する。
  * 外に送るのは固定のリクエストだけ(ユーザーの言葉は使わない)。
  */
-import { ADAPTERS, detectLookup } from "../src/lookup";
+import { ADAPTERS, detectLookup, detectWeather, fetchWeatherDays } from "../src/lookup";
 import { DEFAULT_NEWS_RSS_URL, isUsableHeadline, newsQueryFor, parseRssItems } from "../src/news";
 
 const newsTag = process.argv.find((a) => a.startsWith("--news="))?.split("=")[1];
@@ -29,9 +29,29 @@ for (const [tag, adapter] of Object.entries(ADAPTERS)) {
   }
 }
 
+const weatherPlace = process.argv.find((a) => a.startsWith("--weather="))?.split("=")[1] ?? "昭島市";
+console.log(`\n=== 天気(場所: ${weatherPlace}。地名だけを送る) ===`);
+try {
+  const t0 = Date.now();
+  const days = await fetchWeatherDays(fetch, weatherPlace);
+  console.log(`  ${((Date.now() - t0) / 1000).toFixed(1)}秒 ${days.length}日分`);
+  days.forEach((d) => console.log(`  ${d}`));
+  if (days.length === 0) {
+    failed++;
+    console.log("  ⚠ 0件でした(地名が見つからないか、応答の形が想定と違う可能性があります)");
+  }
+} catch (e) {
+  failed++;
+  console.log(`  ✗ 失敗: ${e instanceof Error ? e.message : e}`);
+}
+
 console.log("\n=== 頼まれたかどうかの判定(通信なし) ===");
 for (const text of ["面白いゲームないかな", "他にも面白いゲームない?", "おすすめのアニメ教えて", "最近人気の曲って何?", "ゲームした", "今日は朝ランした"]) {
   console.log(`  ${detectLookup(text, []) ? "調べる  " : "調べない"}  ${text}`);
+}
+for (const text of ["明日の昭島市の天気どうだろう", "東京の今日の天気教えて", "明後日、大阪は雨降るかな", "今日は雨だった", "明日の天気どうだろう(場所なし)"]) {
+  const w = detectWeather(text);
+  console.log(`  ${w ? `天気を調べる(${w.place}・${w.days.map((d) => ["今日", "明日", "明後日"][d]).join("と")})` : "調べない"}  ${text}`);
 }
 
 if (newsTag) {

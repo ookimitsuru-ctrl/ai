@@ -133,7 +133,7 @@ export async function processPost(env: Env, postId: string, opts: { degraded?: b
     await attachNews(env, postId, topics, targets);
     // 「面白いゲームないかな」のように聞かれたら、人気のものを調べて、返信する全員に渡す(使うかは各キャラの好み次第)
     const lookup = await lookupForText(env, post.body, topics);
-    if (lookup) for (const t of targets) t.lookup = { label: lookup.label, items: lookup.items };
+    if (lookup) for (const t of targets) t.lookup = { label: lookup.label, items: lookup.items, kind: lookup.kind };
   }
   const replies = await generateRepliesSafely(llm, { id: postId, body: post.body }, topics, targets);
 

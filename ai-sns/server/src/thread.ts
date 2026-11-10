@@ -88,7 +88,7 @@ export async function processThreadMessage(env: Env, msgId: string, opts: { degr
   if (!opts.degraded) {
     const own = analyzeByKeywords(msg.text);
     const lookup = await lookupForText(env, msg.text, own.some((t) => t.tag !== "daily") ? own : rootTopics);
-    if (lookup) target.lookup = { label: lookup.label, items: lookup.items };
+    if (lookup) target.lookup = { label: lookup.label, items: lookup.items, kind: lookup.kind };
   }
   const topics = rootTopics;
   const replies = await generateRepliesSafely(llm, { id: msg.id, body: msg.text }, topics, [target], "thread");

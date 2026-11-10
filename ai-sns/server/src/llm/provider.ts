@@ -11,7 +11,7 @@ export interface ReplyTarget {
   /** 最近のニュースの見出し。自然に触れられるときだけ、ひと言触れる(任意) */
   newsHint?: string;
   /** 相手に頼まれて、ネットで調べた結果(例: 人気のゲーム)。好みに合うものを選んで、自然に話す */
-  lookup?: { label: string; items: string[] };
+  lookup?: { label: string; items: string[]; kind?: "recommend" | "fact" };
 }
 
 export interface ReplyRequest {

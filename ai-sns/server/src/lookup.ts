@@ -15,6 +15,8 @@ export interface LookupResult {
   /** 「いま人気のゲーム(Steamの売れ筋)」のような、結果の説明 */
   label: string;
   items: string[];
+  /** recommend: おすすめの候補(好みで選んで話す) / fact: 天気のような事実(数字をそのまま使って答える) */
+  kind?: "recommend" | "fact";
 }
 
 interface Adapter {
@@ -110,6 +112,137 @@ export async function appleTopSongs(f: typeof fetch): Promise<string[]> {
   return fromLegacy();
 }
 
+// ---------------------------------------------------------------------------------------------
+// 天気(Open-Meteo。キー不要)。
+// 場所を調べるため、つぶやきの中の**地名だけ**を外に送る(つぶやき全文・ユーザーを特定する情報は送らない)
+// ---------------------------------------------------------------------------------------------
+
+const WEATHER_TOPIC_RE = /天気|気温|降水|雨|雪|傘|晴れ|曇り|台風|暑い|寒い|予報/;
+const WEATHER_ASK_RE = /どう|だろう|かな|ですか|教えて|知りたい|予報|[?？]|ありそう|降る|大丈夫|必要/;
+
+// 接尾辞の無い主な都市名(「東京の天気」「大阪は?」)
+const CITIES = ["札幌", "仙台", "東京", "横浜", "名古屋", "京都", "大阪", "神戸", "広島", "福岡", "那覇", "新潟", "金沢", "静岡", "岡山", "熊本", "鹿児島", "長崎", "松山", "高松", "さいたま", "千葉", "川崎", "奈良", "大分", "宮崎", "佐賀", "松江", "鳥取", "山口", "徳島", "高知", "和歌山", "津", "岐阜", "名古屋", "福井", "富山", "甲府", "長野", "前橋", "宇都宮", "水戸", "福島", "山形", "秋田", "盛岡", "青森"];
+const TIME_WORDS = /^(今日|明日|明後日|来週|今週|週末|今夜|今朝|明朝|昨日|あさって|あした|きょう)/;
+
+/** つぶやきから、天気を調べたい場所を取り出す。市区町村があればそれを、なければ都道府県、主な都市名の順 */
+export function extractPlace(text: string): string | null {
+  const found: string[] = [];
+  for (const m of text.matchAll(/[一-龥々ヶァ-ヶー]{1,7}?(?:都|道|府|県|市|区|町|村)/g)) {
+    let c = m[0];
+    // 「明日昭島市」「来週栃木県」のように時の言葉が前に付いていたら取り除く
+    for (let i = 0; i < 3; i++) c = c.replace(TIME_WORDS, "");
+    if (c.length >= 2) found.push(c);
+  }
+  const municipal = found.find((c) => /(市|区|町|村)$/.test(c));
+  if (municipal) return municipal;
+  if (found[0]) return found[0];
+  return CITIES.find((c) => text.includes(c)) ?? null;
+}
+
+export interface WeatherAsk {
+  place: string;
+  /** 知りたい日(0=今日, 1=明日, 2=明後日) */
+  days: number[];
+}
+
+/** 天気を聞かれているか。「今日は雨だった」のような報告では調べず、「明日の昭島市の天気どうだろう」のような質問のときだけ */
+export function detectWeather(text: string): WeatherAsk | null {
+  if (!WEATHER_TOPIC_RE.test(text) || !WEATHER_ASK_RE.test(text)) return null;
+  const place = extractPlace(text);
+  if (!place) return null; // 場所が分からないときは調べない(キャラが「どこの天気?」と聞き返せる)
+  const days: number[] = [];
+  if (/明後日|あさって/.test(text)) days.push(2);
+  else if (/明日|あした|明朝/.test(text)) days.push(1);
+  else if (/今日|今夜|今朝|きょう|これから|いま/.test(text)) days.push(0);
+  return { place, days: days.length > 0 ? days : [0, 1] };
+}
+
+/** WMO の天気コード → 日本語 */
+export function weatherCodeText(code: number): string {
+  if (code === 0) return "快晴";
+  if (code === 1) return "晴れ";
+  if (code === 2) return "薄曇り";
+  if (code === 3) return "曇り";
+  if (code === 45 || code === 48) return "霧";
+  if (code >= 51 && code <= 57) return "霧雨";
+  if (code >= 61 && code <= 67) return "雨";
+  if (code >= 71 && code <= 77) return "雪";
+  if (code >= 80 && code <= 82) return "にわか雨";
+  if (code === 85 || code === 86) return "にわか雪";
+  if (code >= 95) return "雷雨";
+  return "不明";
+}
+
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+const dayLabel = (iso: string, offset: number) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  const wd = WEEKDAYS[new Date(Date.UTC(y!, m! - 1, d!)).getUTCDay()];
+  return `${["今日", "明日", "明後日"][offset] ?? ""}(${m}/${d}・${wd})`;
+};
+
+/** 地名 → 緯度経度(Open-Meteo のジオコーディング)。「昭島市」で見つからなければ「昭島」でも試す */
+async function geocode(f: typeof fetch, place: string): Promise<{ lat: number; lon: number; name: string } | null> {
+  const names = [...new Set([place, place.replace(/(都|道|府|県|市|区|町|村)$/, "")].filter((n) => n.length >= 1))];
+  for (const name of names) {
+    const j = (await getJson(f, `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=ja&format=json&countryCode=JP`)) as {
+      results?: { latitude?: number; longitude?: number; name?: string }[];
+    };
+    const r = j.results?.[0];
+    if (r && typeof r.latitude === "number" && typeof r.longitude === "number") return { lat: r.latitude, lon: r.longitude, name: r.name ?? name };
+  }
+  return null;
+}
+
+/** 予報を「今日・明日・明後日・その次」の4日分の文にする(日付はJST) */
+export async function fetchWeatherDays(f: typeof fetch, place: string): Promise<string[]> {
+  const g = await geocode(f, place);
+  if (!g) return [];
+  const j = (await getJson(
+    f,
+    `https://api.open-meteo.com/v1/forecast?latitude=${g.lat}&longitude=${g.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FTokyo&forecast_days=4`,
+  )) as {
+    daily?: { time?: string[]; weather_code?: number[]; temperature_2m_max?: number[]; temperature_2m_min?: number[]; precipitation_probability_max?: (number | null)[] };
+  };
+  const d = j.daily;
+  if (!d?.time || !d.weather_code) return [];
+  return d.time.map((iso, i) => {
+    const parts = [weatherCodeText(d.weather_code![i]!)];
+    const hi = d.temperature_2m_max?.[i];
+    const lo = d.temperature_2m_min?.[i];
+    if (typeof hi === "number" && typeof lo === "number") parts.push(`気温 ${Math.round(lo)}〜${Math.round(hi)}℃`);
+    const pop = d.precipitation_probability_max?.[i];
+    if (typeof pop === "number") parts.push(`降水確率 ${Math.round(pop)}%`);
+    return `${dayLabel(iso, i)}: ${parts.join("、")}`;
+  });
+}
+
+export const WEATHER_TTL_MS = 60 * 60_000;
+
+async function lookupWeather(env: Env, ask: WeatherAsk, f: typeof fetch, now: number): Promise<LookupResult | null> {
+  const today = new Date(now + 9 * 3600_000).toISOString().slice(0, 10); // JSTの日付
+  const key = `weather:${ask.place}:${today}`;
+  const label = `${ask.place}の天気予報(Open-Meteo)`;
+  const pick = (days: string[]) => ask.days.map((i) => days[i]).filter((x): x is string => !!x);
+  const row = await env.DB.prepare("SELECT items, fetched_at FROM lookup_cache WHERE tag = ?").bind(key).first<{ items: string; fetched_at: number }>();
+  if (row && now - row.fetched_at < WEATHER_TTL_MS) {
+    const items = pick(JSON.parse(row.items) as string[]);
+    return items.length > 0 ? { tag: "weather", label, items, kind: "fact" } : null;
+  }
+  try {
+    const days = await fetchWeatherDays(f, ask.place);
+    await env.DB.prepare("INSERT OR REPLACE INTO lookup_cache (tag, items, fetched_at) VALUES (?, ?, ?)").bind(key, JSON.stringify(days), now).run();
+    const items = pick(days);
+    return items.length > 0 ? { tag: "weather", label, items, kind: "fact" } : null;
+  } catch (err) {
+    console.error("weather lookup failed", ask.place, err);
+    await env.DB.prepare("INSERT OR REPLACE INTO lookup_cache (tag, items, fetched_at) VALUES (?, ?, ?)")
+      .bind(key, row?.items ?? "[]", now - WEATHER_TTL_MS + RETRY_AFTER_FAIL_MS)
+      .run();
+    const stale = row ? pick(JSON.parse(row.items) as string[]) : [];
+    return stale.length > 0 ? { tag: "weather", label, items: stale, kind: "fact" } : null;
+  }
+}
+
 /** 話題タグ → 調べ先。ここに無い話題では調べない */
 export const ADAPTERS: Record<string, Adapter> = {
   game: { label: "いま人気のゲーム(Steamの売れ筋)", fetch: steamTopSellers },
@@ -149,6 +282,14 @@ export async function lookupForText(
   now: number = Date.now(),
 ): Promise<LookupResult | null> {
   if (!lookupEnabled(env)) return null;
+  try {
+    // 天気を聞かれたら、場所の天気を調べる(おすすめ探しより先に判定)
+    const weather = detectWeather(text);
+    if (weather) return await lookupWeather(env, weather, fetchImpl, now);
+  } catch (err) {
+    console.error("lookupWeather failed", err);
+    return null;
+  }
   const tag = detectLookup(text, topics);
   if (!tag) return null;
   const adapter = ADAPTERS[tag]!;
@@ -156,12 +297,12 @@ export async function lookupForText(
     const row = await env.DB.prepare("SELECT items, fetched_at FROM lookup_cache WHERE tag = ?").bind(tag).first<{ items: string; fetched_at: number }>();
     if (row && now - row.fetched_at < LOOKUP_TTL_MS) {
       const items = JSON.parse(row.items) as string[];
-      return items.length > 0 ? { tag, label: adapter.label, items } : null;
+      return items.length > 0 ? { tag, label: adapter.label, items, kind: "recommend" as const } : null;
     }
     try {
       const items = await adapter.fetch(fetchImpl);
       await env.DB.prepare("INSERT OR REPLACE INTO lookup_cache (tag, items, fetched_at) VALUES (?, ?, ?)").bind(tag, JSON.stringify(items), now).run();
-      return items.length > 0 ? { tag, label: adapter.label, items } : null;
+      return items.length > 0 ? { tag, label: adapter.label, items, kind: "recommend" as const } : null;
     } catch (err) {
       console.error("lookup failed", tag, err);
       // 失敗: 古い結果があればそれを使い、10分後にまた挑戦できるようにする
@@ -169,7 +310,7 @@ export async function lookupForText(
       await env.DB.prepare("INSERT OR REPLACE INTO lookup_cache (tag, items, fetched_at) VALUES (?, ?, ?)")
         .bind(tag, JSON.stringify(stale), now - LOOKUP_TTL_MS + RETRY_AFTER_FAIL_MS)
         .run();
-      return stale.length > 0 ? { tag, label: adapter.label, items: stale } : null;
+      return stale.length > 0 ? { tag, label: adapter.label, items: stale, kind: "recommend" as const } : null;
     }
   } catch (err) {
     console.error("lookupForText failed", err);
