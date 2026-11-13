@@ -11,11 +11,13 @@
  * オプション: --personas=kenji_run,miyu_cafe  返信させる人を指定(省略時は話題に合う上位5人)
  *            --new=kenji_run                   その人を「今フォローしてきた」扱いにする
  */
+import { assignAngles } from "../src/angles";
 import { PERSONAS, PERSONA_BY_ID } from "../src/data";
 import { computeAffinity } from "../src/follow";
 import { createLlmProvider } from "../src/llm";
 import { PromptedLlmProvider } from "../src/llm/prompted";
 import { verifyReply } from "../src/llm/verify";
+import { assignRoles, looksLikeRequest } from "../src/roles";
 import type { Env, Persona } from "../src/types";
 
 const args = process.argv.slice(2);
@@ -48,11 +50,24 @@ if (ids) {
 }
 const newId = opt("new");
 
+// 本番と同じように、質問・頼みごとなら「役割分担」、そうでなければ「切り口」を割り当てる
+const asking = looksLikeRequest(post);
+const ranked = [...chosen].sort((a, b) => computeAffinity(b, topics) - computeAffinity(a, topics)).map((p) => p.id);
+const roles = asking ? assignRoles(ranked) : new Map<string, string>();
+const angles = asking ? new Map<string, string>() : assignAngles("try", chosen.map((p) => p.id));
+console.log(asking ? "[質問・頼みごと] 役割を分担して答えさせます" : "[ふつうのつぶやき] 切り口を変えて返信させます");
+
 const t1 = Date.now();
 const replies = await llm.generateReplies({
   post: { id: "try", body: post },
   topics,
-  targets: chosen.map((persona) => ({ persona, isNewFollower: persona.id === newId, recentExchanges: [] })),
+  targets: chosen.map((persona) => ({
+    persona,
+    isNewFollower: persona.id === newId,
+    recentExchanges: [],
+    role: roles.get(persona.id),
+    angle: angles.get(persona.id),
+  })),
 });
 const sec = ((Date.now() - t1) / 1000).toFixed(1);
 console.log(`[返信生成] ${chosen.length}人分 ${sec}秒\n`);
@@ -62,7 +77,8 @@ for (const r of replies) {
   const persona = PERSONA_BY_ID.get(r.personaId)!;
   const problem = verifyReply(persona, r.text, post);
   if (!problem) ok++;
-  console.log(`${persona.name}(@${persona.handle})${r.mood === "fallback" ? "  ※セリフ例で代用" : ""}`);
+  const role = roles.get(r.personaId);
+  console.log(`${persona.name}(@${persona.handle})${role ? `  [役割: ${role.slice(0, 14)}…]` : ""}${r.mood === "fallback" ? "  ※セリフ例で代用" : ""}`);
   console.log(`  ${r.text}`);
   if (problem) console.log(`  ⚠ 基準違反: ${problem}`);
 }
